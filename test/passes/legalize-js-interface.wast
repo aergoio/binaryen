@@ -8,5 +8,23 @@
     (unreachable)
   )
 )
+(module
+  (export "func" (func $func))
+  (func $getTempRet0 (result i32)
+    (i32.const 10)
+  )
+  (func $setTempRet0 (param i32))
+  (func $func (result i64)
+    (i64.const 7)
+  )
+)
+(module
+  (import "env" "setTempRet0" (func $renamed_set (param i32)))
+  (import "env" "getTempRet0" (func $renamed_get (result i32)))
+  (func $func (result i32)
+    (call $renamed_set (i32.const 3))
+    (call $renamed_get)
+  )
+)
 (module)
 
