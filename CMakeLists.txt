@@ -140,22 +140,99 @@ ENDIF()
 # Current (partial) dependency structure is as follows:
 # passes -> wasm -> asmjs -> support
 # TODO: It's odd that wasm should depend on asmjs, maybe we should fix that.
-ADD_SUBDIRECTORY(src/ir)
-ADD_SUBDIRECTORY(src/asmjs)
-ADD_SUBDIRECTORY(src/cfg)
-ADD_SUBDIRECTORY(src/emscripten-optimizer)
+#ADD_SUBDIRECTORY(src/ir)
+#ADD_SUBDIRECTORY(src/asmjs)
+#ADD_SUBDIRECTORY(src/cfg)
+#ADD_SUBDIRECTORY(src/emscripten-optimizer)
 ADD_SUBDIRECTORY(src/passes)
-ADD_SUBDIRECTORY(src/support)
-ADD_SUBDIRECTORY(src/wasm)
+#ADD_SUBDIRECTORY(src/support)
+#ADD_SUBDIRECTORY(src/wasm)
 
 # Sources.
 
 
 SET(binaryen_SOURCES
   src/binaryen-c.cpp
+  src/passes/pass.cpp
+  src/passes/CoalesceLocals.cpp
+  src/passes/CodePushing.cpp
+  src/passes/CodeFolding.cpp
+  src/passes/ConstHoisting.cpp
+  src/passes/DataFlowOpts.cpp
+  src/passes/DeadArgumentElimination.cpp
+  src/passes/DeadCodeElimination.cpp
+  src/passes/DuplicateFunctionElimination.cpp
+  src/passes/ExtractFunction.cpp
+  src/passes/Flatten.cpp
+  src/passes/FuncCastEmulation.cpp
+  src/passes/I64ToI32Lowering.cpp
+  src/passes/Inlining.cpp
+  src/passes/InstrumentLocals.cpp
+  src/passes/InstrumentMemory.cpp
+  src/passes/LegalizeJSInterface.cpp
+  src/passes/LocalCSE.cpp
+  src/passes/LogExecution.cpp
+  src/passes/LoopInvariantCodeMotion.cpp
+  src/passes/MemoryPacking.cpp
+  src/passes/MergeBlocks.cpp
+  src/passes/MergeLocals.cpp
+  src/passes/Metrics.cpp
+  src/passes/NameList.cpp
+  src/passes/OptimizeInstructions.cpp
+  src/passes/PickLoadSigns.cpp
+  src/passes/PostEmscripten.cpp
+  src/passes/Precompute.cpp
+  src/passes/Print.cpp
+  src/passes/PrintCallGraph.cpp
+  src/passes/StackIR.cpp
+  src/passes/RedundantSetElimination.cpp
+  src/passes/RelooperJumpThreading.cpp
+  src/passes/ReReloop.cpp
+  src/passes/RemoveImports.cpp
+  src/passes/RemoveMemory.cpp
+  src/passes/RemoveNonJSOps.cpp
+  src/passes/RemoveUnusedBrs.cpp
+  src/passes/RemoveUnusedNames.cpp
+  src/passes/RemoveUnusedModuleElements.cpp
+  src/passes/ReorderLocals.cpp
+  src/passes/ReorderFunctions.cpp
+  src/passes/TrapMode.cpp
+  src/passes/SafeHeap.cpp
+  src/passes/SimplifyLocals.cpp
+  src/passes/Souperify.cpp
+  src/passes/SpillPointers.cpp
+  src/passes/SSAify.cpp
+  src/passes/Untee.cpp
+  src/passes/Vacuum.cpp
+  src/passes/WasmIntrinsics.cpp
+  src/wasm/literal.cpp
+  src/wasm/wasm.cpp
+  src/wasm/wasm-binary.cpp
+  src/wasm/wasm-emscripten.cpp
+  src/wasm/wasm-interpreter.cpp
+  src/wasm/wasm-io.cpp
+  src/wasm/wasm-s-parser.cpp
+  src/wasm/wasm-type.cpp
+  src/wasm/wasm-validator.cpp
+  src/asmjs/asm_v_wasm.cpp
+  src/asmjs/asmangle.cpp
+  src/asmjs/shared-constants.cpp
+  src/emscripten-optimizer/optimizer-shared.cpp
+  src/emscripten-optimizer/parser.cpp
+  src/emscripten-optimizer/simple_ast.cpp
+  src/ir/ExpressionAnalyzer.cpp
+  src/ir/ExpressionManipulator.cpp
+  src/ir/LocalGraph.cpp
+  src/cfg/Relooper.cpp
+  src/support/archive.cpp
+  src/support/bits.cpp
+  src/support/colors.cpp
+  src/support/file.cpp
+  src/support/safe_integer.cpp
+  src/support/threads.cpp
 )
 ADD_LIBRARY(binaryen STATIC ${binaryen_SOURCES})
-TARGET_LINK_LIBRARIES(binaryen passes wasm asmjs emscripten-optimizer ir cfg support)
+TARGET_LINK_LIBRARIES(binaryen ${CMAKE_THREAD_LIBS_INIT})
 
 #SET_TARGET_PROPERTIES(binaryen PROPERTIES ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_SOURCE_DIR}/../../lib)
 #CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/src/binaryen-c.h ${CMAKE_CURRENT_SOURCE_DIR}/../../include COPYONLY)
