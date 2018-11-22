@@ -148,7 +148,7 @@ ENDIF()
 #ADD_SUBDIRECTORY(src/asmjs)
 #ADD_SUBDIRECTORY(src/cfg)
 #ADD_SUBDIRECTORY(src/emscripten-optimizer)
-ADD_SUBDIRECTORY(src/passes)
+#ADD_SUBDIRECTORY(src/passes)
 #ADD_SUBDIRECTORY(src/support)
 #ADD_SUBDIRECTORY(src/wasm)
 
@@ -238,5 +238,17 @@ SET(binaryen_SOURCES
 ADD_LIBRARY(binaryen STATIC ${binaryen_SOURCES})
 TARGET_LINK_LIBRARIES(binaryen ${CMAKE_THREAD_LIBS_INIT})
 
-#SET_TARGET_PROPERTIES(binaryen PROPERTIES ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_SOURCE_DIR}/../../lib)
-#CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/src/binaryen-c.h ${CMAKE_CURRENT_SOURCE_DIR}/../../include COPYONLY)
+add_custom_command(
+  OUTPUT ${PROJECT_SOURCE_DIR}/src/passes/WasmIntrinsics.cpp
+  COMMAND python ${PROJECT_SOURCE_DIR}/scripts/embedwast.py ${PROJECT_SOURCE_DIR}/src/passes/wasm-intrinsics.wast ${PROJECT_SOURCE_DIR}/src/passes/WasmIntrinsics.cpp
+  DEPENDS ${PROJECT_SOURCE_DIR}/scripts/embedwast.py ${PROJECT_SOURCE_DIR}/src/passes/wasm-intrinsics.wast)
+add_custom_target(intrinsic-gen DEPENDS ${PROJECT_SOURCE_DIR}/src/passes/WasmIntrinsics.cpp)
+add_dependencies(binaryen intrinsic-gen)
+
+SET_TARGET_PROPERTIES(binaryen PROPERTIES 
+  ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_SOURCE_DIR}/../../lib
+  ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_SOURCE_DIR}/../../lib
+)
+
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/src/binaryen-c.h ${CMAKE_CURRENT_SOURCE_DIR}/../../include COPYONLY)
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/src/compiler-support.h ${CMAKE_CURRENT_SOURCE_DIR}/../../include COPYONLY)
