@@ -54,6 +54,11 @@ struct Visitor {
   ReturnType visitAtomicCmpxchg(AtomicCmpxchg* curr) { return ReturnType(); }
   ReturnType visitAtomicWait(AtomicWait* curr) { return ReturnType(); }
   ReturnType visitAtomicWake(AtomicWake* curr) { return ReturnType(); }
+  ReturnType visitSIMDExtract(SIMDExtract* curr) { return ReturnType(); }
+  ReturnType visitSIMDReplace(SIMDReplace* curr) { return ReturnType(); }
+  ReturnType visitSIMDShuffle(SIMDShuffle* curr) { return ReturnType(); }
+  ReturnType visitSIMDBitselect(SIMDBitselect* curr) { return ReturnType(); }
+  ReturnType visitSIMDShift(SIMDShift* curr) { return ReturnType(); }
   ReturnType visitConst(Const* curr) { return ReturnType(); }
   ReturnType visitUnary(Unary* curr) { return ReturnType(); }
   ReturnType visitBinary(Binary* curr) { return ReturnType(); }
@@ -97,6 +102,11 @@ struct Visitor {
       case Expression::Id::AtomicCmpxchgId: DELEGATE(AtomicCmpxchg);
       case Expression::Id::AtomicWaitId: DELEGATE(AtomicWait);
       case Expression::Id::AtomicWakeId: DELEGATE(AtomicWake);
+      case Expression::Id::SIMDExtractId: DELEGATE(SIMDExtract);
+      case Expression::Id::SIMDReplaceId: DELEGATE(SIMDReplace);
+      case Expression::Id::SIMDShuffleId: DELEGATE(SIMDShuffle);
+      case Expression::Id::SIMDBitselectId: DELEGATE(SIMDBitselect);
+      case Expression::Id::SIMDShiftId: DELEGATE(SIMDShift);
       case Expression::Id::ConstId: DELEGATE(Const);
       case Expression::Id::UnaryId: DELEGATE(Unary);
       case Expression::Id::BinaryId: DELEGATE(Binary);
@@ -142,6 +152,11 @@ struct OverriddenVisitor {
   UNIMPLEMENTED(AtomicCmpxchg);
   UNIMPLEMENTED(AtomicWait);
   UNIMPLEMENTED(AtomicWake);
+  UNIMPLEMENTED(SIMDExtract);
+  UNIMPLEMENTED(SIMDReplace);
+  UNIMPLEMENTED(SIMDShuffle);
+  UNIMPLEMENTED(SIMDBitselect);
+  UNIMPLEMENTED(SIMDShift);
   UNIMPLEMENTED(Const);
   UNIMPLEMENTED(Unary);
   UNIMPLEMENTED(Binary);
@@ -186,6 +201,11 @@ struct OverriddenVisitor {
       case Expression::Id::AtomicCmpxchgId: DELEGATE(AtomicCmpxchg);
       case Expression::Id::AtomicWaitId: DELEGATE(AtomicWait);
       case Expression::Id::AtomicWakeId: DELEGATE(AtomicWake);
+      case Expression::Id::SIMDExtractId: DELEGATE(SIMDExtract);
+      case Expression::Id::SIMDReplaceId: DELEGATE(SIMDReplace);
+      case Expression::Id::SIMDShuffleId: DELEGATE(SIMDShuffle);
+      case Expression::Id::SIMDBitselectId: DELEGATE(SIMDBitselect);
+      case Expression::Id::SIMDShiftId: DELEGATE(SIMDShift);
       case Expression::Id::ConstId: DELEGATE(Const);
       case Expression::Id::UnaryId: DELEGATE(Unary);
       case Expression::Id::BinaryId: DELEGATE(Binary);
@@ -229,6 +249,11 @@ struct UnifiedExpressionVisitor : public Visitor<SubType, ReturnType> {
   ReturnType visitAtomicCmpxchg(AtomicCmpxchg* curr) { return static_cast<SubType*>(this)->visitExpression(curr); }
   ReturnType visitAtomicWait(AtomicWait* curr) { return static_cast<SubType*>(this)->visitExpression(curr); }
   ReturnType visitAtomicWake(AtomicWake* curr) { return static_cast<SubType*>(this)->visitExpression(curr); }
+  ReturnType visitSIMDExtract(SIMDExtract* curr) { return static_cast<SubType*>(this)->visitExpression(curr); }
+  ReturnType visitSIMDReplace(SIMDReplace* curr) { return static_cast<SubType*>(this)->visitExpression(curr); }
+  ReturnType visitSIMDShuffle(SIMDShuffle* curr) { return static_cast<SubType*>(this)->visitExpression(curr); }
+  ReturnType visitSIMDBitselect(SIMDBitselect* curr) { return static_cast<SubType*>(this)->visitExpression(curr); }
+  ReturnType visitSIMDShift(SIMDShift* curr) { return static_cast<SubType*>(this)->visitExpression(curr); }
   ReturnType visitConst(Const* curr) { return static_cast<SubType*>(this)->visitExpression(curr); }
   ReturnType visitUnary(Unary* curr) { return static_cast<SubType*>(this)->visitExpression(curr); }
   ReturnType visitBinary(Binary* curr) { return static_cast<SubType*>(this)->visitExpression(curr); }
@@ -414,6 +439,11 @@ struct Walker : public VisitorType {
   static void doVisitAtomicCmpxchg(SubType* self, Expression** currp){ self->visitAtomicCmpxchg((*currp)->cast<AtomicCmpxchg>()); }
   static void doVisitAtomicWait(SubType* self, Expression** currp)   { self->visitAtomicWait((*currp)->cast<AtomicWait>()); }
   static void doVisitAtomicWake(SubType* self, Expression** currp)   { self->visitAtomicWake((*currp)->cast<AtomicWake>()); }
+  static void doVisitSIMDExtract(SubType* self, Expression** currp)  { self->visitSIMDExtract((*currp)->cast<SIMDExtract>()); }
+  static void doVisitSIMDReplace(SubType* self, Expression** currp)  { self->visitSIMDReplace((*currp)->cast<SIMDReplace>()); }
+  static void doVisitSIMDShuffle(SubType* self, Expression** currp)  { self->visitSIMDShuffle((*currp)->cast<SIMDShuffle>()); }
+  static void doVisitSIMDBitselect(SubType* self, Expression** currp) { self->visitSIMDBitselect((*currp)->cast<SIMDBitselect>()); }
+  static void doVisitSIMDShift(SubType* self, Expression** currp)    { self->visitSIMDShift((*currp)->cast<SIMDShift>()); }
   static void doVisitConst(SubType* self, Expression** currp)        { self->visitConst((*currp)->cast<Const>()); }
   static void doVisitUnary(SubType* self, Expression** currp)        { self->visitUnary((*currp)->cast<Unary>()); }
   static void doVisitBinary(SubType* self, Expression** currp)       { self->visitBinary((*currp)->cast<Binary>()); }
@@ -554,6 +584,36 @@ struct PostWalker : public Walker<SubType, VisitorType> {
         self->pushTask(SubType::scan, &curr->cast<AtomicWake>()->ptr);
         break;
       }
+      case Expression::Id::SIMDExtractId: {
+        self->pushTask(SubType::doVisitSIMDExtract, currp);
+        self->pushTask(SubType::scan, &curr->cast<SIMDExtract>()->vec);
+        break;
+      }
+      case Expression::Id::SIMDReplaceId: {
+        self->pushTask(SubType::doVisitSIMDReplace, currp);
+        self->pushTask(SubType::scan, &curr->cast<SIMDReplace>()->value);
+        self->pushTask(SubType::scan, &curr->cast<SIMDReplace>()->vec);
+        break;
+      }
+      case Expression::Id::SIMDShuffleId: {
+        self->pushTask(SubType::doVisitSIMDShuffle, currp);
+        self->pushTask(SubType::scan, &curr->cast<SIMDShuffle>()->right);
+        self->pushTask(SubType::scan, &curr->cast<SIMDShuffle>()->left);
+        break;
+      }
+      case Expression::Id::SIMDBitselectId: {
+        self->pushTask(SubType::doVisitSIMDBitselect, currp);
+        self->pushTask(SubType::scan, &curr->cast<SIMDBitselect>()->cond);
+        self->pushTask(SubType::scan, &curr->cast<SIMDBitselect>()->right);
+        self->pushTask(SubType::scan, &curr->cast<SIMDBitselect>()->left);
+        break;
+      }
+      case Expression::Id::SIMDShiftId: {
+        self->pushTask(SubType::doVisitSIMDShift, currp);
+        self->pushTask(SubType::scan, &curr->cast<SIMDShift>()->shift);
+        self->pushTask(SubType::scan, &curr->cast<SIMDShift>()->vec);
+        break;
+      }
       case Expression::Id::ConstId: {
         self->pushTask(SubType::doVisitConst, currp);
         break;
@@ -602,7 +662,7 @@ struct PostWalker : public Walker<SubType, VisitorType> {
         self->pushTask(SubType::doVisitUnreachable, currp);
         break;
       }
-      default: WASM_UNREACHABLE();
+      case Expression::Id::NumExpressionIds: WASM_UNREACHABLE();
     }
   }
 };
@@ -611,7 +671,7 @@ struct PostWalker : public Walker<SubType, VisitorType> {
 
 template<typename SubType, typename VisitorType = Visitor<SubType>>
 struct ControlFlowWalker : public PostWalker<SubType, VisitorType> {
-  ControlFlowWalker() {}
+  ControlFlowWalker() = default;
 
   std::vector<Expression*> controlFlowStack; // contains blocks, loops, and ifs
 
@@ -674,7 +734,7 @@ struct ControlFlowWalker : public PostWalker<SubType, VisitorType> {
 
 template<typename SubType, typename VisitorType = Visitor<SubType>>
 struct ExpressionStackWalker : public PostWalker<SubType, VisitorType> {
-  ExpressionStackWalker() {}
+  ExpressionStackWalker() = default;
 
   std::vector<Expression*> expressionStack;
 
@@ -738,7 +798,7 @@ struct ExpressionStackWalker : public PostWalker<SubType, VisitorType> {
 
 template<typename SubType, typename VisitorType = Visitor<SubType>>
 struct LinearExecutionWalker : public PostWalker<SubType, VisitorType> {
-  LinearExecutionWalker() {}
+  LinearExecutionWalker() = default;
 
   // subclasses should implement this
   void noteNonLinear(Expression* curr) { abort(); }

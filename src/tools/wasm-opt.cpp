@@ -65,7 +65,8 @@ int main(int argc, const char* argv[]) {
   bool emitBinary = true;
   bool debugInfo = false;
   bool converge = false;
-  bool fuzzExec = false;
+  bool fuzzExecBefore = false;
+  bool fuzzExecAfter = false;
   bool fuzzBinary = false;
   std::string extraFuzzCommand;
   bool translateToFuzz = false;
@@ -93,9 +94,12 @@ int main(int argc, const char* argv[]) {
       .add("--converge", "-c", "Run passes to convergence, continuing while binary size decreases",
            Options::Arguments::Zero,
            [&](Options *o, const std::string& arguments) { converge = true; })
+      .add("--fuzz-exec-before", "-feh", "Execute functions before optimization, helping fuzzing find bugs",
+           Options::Arguments::Zero,
+           [&](Options *o, const std::string& arguments) { fuzzExecBefore = true; })
       .add("--fuzz-exec", "-fe", "Execute functions before and after optimization, helping fuzzing find bugs",
            Options::Arguments::Zero,
-           [&](Options *o, const std::string& arguments) { fuzzExec = true; })
+           [&](Options *o, const std::string& arguments) { fuzzExecBefore = fuzzExecAfter = true; })
       .add("--fuzz-binary", "-fb", "Convert to binary and back after optimizations and before fuzz-exec, helping fuzzing find binary format bugs",
            Options::Arguments::Zero,
            [&](Options *o, const std::string& arguments) { fuzzBinary = true; })
@@ -130,9 +134,6 @@ int main(int argc, const char* argv[]) {
   options.parse(argc, argv);
 
   Module wasm;
-  // It should be safe to just always enable atomics in wasm-opt, because we
-  // don't expect any passes to accidentally generate atomic ops
-  FeatureSet features = Feature::Atomics;
 
   if (options.debug) std::cerr << "reading...\n";
 
@@ -154,7 +155,7 @@ int main(int argc, const char* argv[]) {
     }
 
     if (options.passOptions.validate) {
-      if (!WasmValidator().validate(wasm, features)) {
+      if (!WasmValidator().validate(wasm, options.getFeatures())) {
         WasmPrinter::printModule(&wasm);
         Fatal() << "error in validating input";
       }
@@ -165,9 +166,9 @@ int main(int argc, const char* argv[]) {
     if (fuzzPasses) {
       reader.pickPasses(options);
     }
-    reader.build();
+    reader.build(options.getFeatures());
     if (options.passOptions.validate) {
-      if (!WasmValidator().validate(wasm, features)) {
+      if (!WasmValidator().validate(wasm, options.getFeatures())) {
         WasmPrinter::printModule(&wasm);
         std::cerr << "translate-to-fuzz must always generate a valid module";
         abort();
@@ -175,8 +176,15 @@ int main(int argc, const char* argv[]) {
     }
   }
 
+  if (emitJSWrapper.size() > 0) {
+    // As the code will run in JS, we must legalize it.
+    PassRunner runner(&wasm);
+    runner.add("legalize-js-interface");
+    runner.run();
+  }
+
   ExecutionResults results;
-  if (fuzzExec) {
+  if (fuzzExecBefore) {
     results.get(wasm);
   }
 
@@ -210,7 +218,7 @@ int main(int argc, const char* argv[]) {
   Module* curr = &wasm;
   Module other;
 
-  if (fuzzExec && fuzzBinary) {
+  if (fuzzExecAfter && fuzzBinary) {
     BufferWithRandomAccess buffer(false);
     // write the binary
     WasmBinaryWriter writer(&wasm, buffer, false);
@@ -220,7 +228,7 @@ int main(int argc, const char* argv[]) {
     WasmBinaryBuilder parser(other, input, false);
     parser.read();
     if (options.passOptions.validate) {
-      bool valid = WasmValidator().validate(other, features);
+      bool valid = WasmValidator().validate(other, options.getFeatures());
       if (!valid) {
         WasmPrinter::printModule(&other);
       }
@@ -234,7 +242,7 @@ int main(int argc, const char* argv[]) {
     auto runPasses = [&]() {
       options.runPasses(*curr);
       if (options.passOptions.validate) {
-        bool valid = WasmValidator().validate(*curr, features);
+        bool valid = WasmValidator().validate(*curr, options.getFeatures());
         if (!valid) {
           WasmPrinter::printModule(&*curr);
         }
@@ -262,7 +270,7 @@ int main(int argc, const char* argv[]) {
     }
   }
 
-  if (fuzzExec) {
+  if (fuzzExecAfter) {
     results.check(*curr);
   }
 

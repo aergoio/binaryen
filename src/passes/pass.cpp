@@ -85,6 +85,7 @@ void PassRegistry::registerPasses() {
   registerPass("inlining", "inline functions (you probably want inlining-optimizing)", createInliningPass);
   registerPass("inlining-optimizing", "inline functions and optimizes where we inlined", createInliningOptimizingPass);
   registerPass("legalize-js-interface", "legalizes i64 types on the import/export boundary", createLegalizeJSInterfacePass);
+  registerPass("legalize-js-interface-minimally", "legalizes i64 types on the import/export boundary in a minimal manner, only on things only JS will call", createLegalizeJSInterfaceMinimallyPass);
   registerPass("local-cse", "common subexpression elimination inside basic blocks", createLocalCSEPass);
   registerPass("log-execution", "instrument the build with logging of where execution goes", createLogExecutionPass);
   registerPass("i64-to-i32-lowering", "lower all uses of i64s to use i32s instead", createI64ToI32LoweringPass);
@@ -95,7 +96,10 @@ void PassRegistry::registerPasses() {
   registerPass("merge-blocks", "merges blocks to their parents", createMergeBlocksPass);
   registerPass("merge-locals", "merges locals when beneficial", createMergeLocalsPass);
   registerPass("metrics", "reports metrics", createMetricsPass);
+  registerPass("minify-imports", "minifies import names (only those, and not export names), and emits a mapping to the minified ones", createMinifyImportsPass);
+  registerPass("minify-imports-and-exports", "minifies both import and export names, and emits a mapping to the minified ones", createMinifyImportsAndExportsPass);
   registerPass("nm", "name list", createNameListPass);
+  registerPass("no-exit-runtime", "removes calls to atexit(), which is valid if the C runtime will never be exited", createNoExitRuntimePass);
   registerPass("optimize-instructions", "optimizes instruction combinations", createOptimizeInstructionsPass);
   registerPass("optimize-stack-ir", "optimize Stack IR", createOptimizeStackIRPass);
   registerPass("pick-load-signs", "pick load signs based on their uses", createPickLoadSignsPass);
@@ -118,7 +122,7 @@ void PassRegistry::registerPasses() {
   registerPass("reorder-functions", "sorts functions by access frequency", createReorderFunctionsPass);
   registerPass("reorder-locals", "sorts locals by access frequency", createReorderLocalsPass);
   registerPass("rereloop", "re-optimize control flow using the relooper algorithm", createReReloopPass);
-  registerPass("rse", "remove redundant set_locals", createRedundantSetEliminationPass);
+  registerPass("rse", "remove redundant local.sets", createRedundantSetEliminationPass);
   registerPass("safe-heap", "instrument loads and stores to check for invalid behavior", createSafeHeapPass);
   registerPass("simplify-locals", "miscellaneous locals-related optimizations", createSimplifyLocalsPass);
   registerPass("simplify-locals-nonesting", "miscellaneous locals-related optimizations (no nesting at all; preserves flatness)", createSimplifyLocalsNoNestingPass);
@@ -129,9 +133,10 @@ void PassRegistry::registerPasses() {
   registerPass("souperify-single-use", "emit Souper IR in text form (single-use nodes only)", createSouperifySingleUsePass);
   registerPass("spill-pointers", "spill pointers to the C stack (useful for Boehm-style GC)", createSpillPointersPass);
   registerPass("ssa", "ssa-ify variables so that they have a single assignment", createSSAifyPass);
+  registerPass("strip", "strip debug info (including the names section)", createStripPass);
   registerPass("trap-mode-clamp", "replace trapping operations with clamping semantics", createTrapModeClamp);
   registerPass("trap-mode-js", "replace trapping operations with js semantics", createTrapModeJS);
-  registerPass("untee", "removes tee_locals, replacing them with sets and gets", createUnteePass);
+  registerPass("untee", "removes local.tees, replacing them with sets and gets", createUnteePass);
   registerPass("vacuum", "removes obviously unneeded code", createVacuumPass);
 //  registerPass("lower-i64", "lowers i64 into pairs of i32s", createLowerInt64Pass);
 }
@@ -177,13 +182,17 @@ void PassRunner::addDefaultFunctionOptimizationPasses() {
   }
   add("coalesce-locals");
   add("simplify-locals");
-  add("vacuum"); // previous pass creates garbage
+  add("vacuum");
   add("reorder-locals");
+  add("coalesce-locals");
+  add("reorder-locals");
+  add("vacuum");
   if (options.optimizeLevel >= 3 || options.shrinkLevel >= 1) {
     add("code-folding");
   }
   add("merge-blocks"); // makes remove-unused-brs more effective
-  add("remove-unused-brs"); // coalesce-locals opens opportunities for optimizations
+  add("remove-unused-brs"); // coalesce-locals opens opportunities
+  add("remove-unused-names"); // remove-unused-brs opens opportunities
   add("merge-blocks"); // clean up remove-unused-brs new blocks
   add("optimize-instructions");
   // late propagation

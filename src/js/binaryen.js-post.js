@@ -22,12 +22,21 @@ function i32sToStack(i32s) {
   return ret;
 }
 
+function i8sToStack(i8s) {
+  var ret = stackAlloc(i8s.length);
+  for (var i = 0; i < i8s.length; i++) {
+    HEAP8[ret + i] = i8s[i];
+  }
+  return ret;
+}
+
 // Types
 Module['none'] = Module['_BinaryenTypeNone']();
 Module['i32'] = Module['_BinaryenTypeInt32']();
 Module['i64'] = Module['_BinaryenTypeInt64']();
 Module['f32'] = Module['_BinaryenTypeFloat32']();
 Module['f64'] = Module['_BinaryenTypeFloat64']();
+Module['v128'] = Module['_BinaryenTypeVec128']();
 Module['unreachable'] = Module['_BinaryenTypeUnreachable']();
 Module['auto'] = /* deprecated */ Module['undefined'] = Module['_BinaryenTypeAuto']();
 
@@ -59,6 +68,11 @@ Module['AtomicCmpxchgId'] = Module['_BinaryenAtomicCmpxchgId']();
 Module['AtomicRMWId'] = Module['_BinaryenAtomicRMWId']();
 Module['AtomicWaitId'] = Module['_BinaryenAtomicWaitId']();
 Module['AtomicWakeId'] = Module['_BinaryenAtomicWakeId']();
+Module['SIMDExtractId'] = Module['_BinaryenSIMDExtractId']();
+Module['SIMDReplaceId'] = Module['_BinaryenSIMDReplaceId']();
+Module['SIMDShuffleId'] = Module['_BinaryenSIMDShuffleId']();
+Module['SIMDBitselectId'] = Module['_BinaryenSIMDBitselectId']();
+Module['SIMDShiftId'] = Module['_BinaryenSIMDShiftId']();
 
 // External kinds
 Module['ExternalFunction'] = Module['_BinaryenExternalFunction']();
@@ -100,6 +114,14 @@ Module['TruncSFloat64ToInt32'] = Module['_BinaryenTruncSFloat64ToInt32']();
 Module['TruncSFloat64ToInt64'] = Module['_BinaryenTruncSFloat64ToInt64']();
 Module['TruncUFloat64ToInt32'] = Module['_BinaryenTruncUFloat64ToInt32']();
 Module['TruncUFloat64ToInt64'] = Module['_BinaryenTruncUFloat64ToInt64']();
+Module['TruncSatSFloat32ToInt32'] = Module['_BinaryenTruncSatSFloat32ToInt32']();
+Module['TruncSatSFloat32ToInt64'] = Module['_BinaryenTruncSatSFloat32ToInt64']();
+Module['TruncSatUFloat32ToInt32'] = Module['_BinaryenTruncSatUFloat32ToInt32']();
+Module['TruncSatUFloat32ToInt64'] = Module['_BinaryenTruncSatUFloat32ToInt64']();
+Module['TruncSatSFloat64ToInt32'] = Module['_BinaryenTruncSatSFloat64ToInt32']();
+Module['TruncSatSFloat64ToInt64'] = Module['_BinaryenTruncSatSFloat64ToInt64']();
+Module['TruncSatUFloat64ToInt32'] = Module['_BinaryenTruncSatUFloat64ToInt32']();
+Module['TruncSatUFloat64ToInt64'] = Module['_BinaryenTruncSatUFloat64ToInt64']();
 Module['ReinterpretFloat32'] = Module['_BinaryenReinterpretFloat32']();
 Module['ReinterpretFloat64'] = Module['_BinaryenReinterpretFloat64']();
 Module['ConvertSInt32ToFloat32'] = Module['_BinaryenConvertSInt32ToFloat32']();
@@ -203,38 +225,186 @@ Module['AtomicRMWAnd'] = Module['_BinaryenAtomicRMWAnd']();
 Module['AtomicRMWOr'] = Module['_BinaryenAtomicRMWOr']();
 Module['AtomicRMWXor'] = Module['_BinaryenAtomicRMWXor']();
 Module['AtomicRMWXchg'] = Module['_BinaryenAtomicRMWXchg']();
+Module['SplatVecI8x16'] = Module['_BinaryenSplatVecI8x16']();
+Module['ExtractLaneSVecI8x16'] = Module['_BinaryenExtractLaneSVecI8x16']();
+Module['ExtractLaneUVecI8x16'] = Module['_BinaryenExtractLaneUVecI8x16']();
+Module['ReplaceLaneVecI8x16'] = Module['_BinaryenReplaceLaneVecI8x16']();
+Module['SplatVecI16x8'] = Module['_BinaryenSplatVecI16x8']();
+Module['ExtractLaneSVecI16x8'] = Module['_BinaryenExtractLaneSVecI16x8']();
+Module['ExtractLaneUVecI16x8'] = Module['_BinaryenExtractLaneUVecI16x8']();
+Module['ReplaceLaneVecI16x8'] = Module['_BinaryenReplaceLaneVecI16x8']();
+Module['SplatVecI32x4'] = Module['_BinaryenSplatVecI32x4']();
+Module['ExtractLaneVecI32x4'] = Module['_BinaryenExtractLaneVecI32x4']();
+Module['ReplaceLaneVecI32x4'] = Module['_BinaryenReplaceLaneVecI32x4']();
+Module['SplatVecI64x2'] = Module['_BinaryenSplatVecI64x2']();
+Module['ExtractLaneVecI64x2'] = Module['_BinaryenExtractLaneVecI64x2']();
+Module['ReplaceLaneVecI64x2'] = Module['_BinaryenReplaceLaneVecI64x2']();
+Module['SplatVecF32x4'] = Module['_BinaryenSplatVecF32x4']();
+Module['ExtractLaneVecF32x4'] = Module['_BinaryenExtractLaneVecF32x4']();
+Module['ReplaceLaneVecF32x4'] = Module['_BinaryenReplaceLaneVecF32x4']();
+Module['SplatVecF64x2'] = Module['_BinaryenSplatVecF64x2']();
+Module['ExtractLaneVecF64x2'] = Module['_BinaryenExtractLaneVecF64x2']();
+Module['ReplaceLaneVecF64x2'] = Module['_BinaryenReplaceLaneVecF64x2']();
+Module['EqVecI8x16'] = Module['_BinaryenEqVecI8x16']();
+Module['NeVecI8x16'] = Module['_BinaryenNeVecI8x16']();
+Module['LtSVecI8x16'] = Module['_BinaryenLtSVecI8x16']();
+Module['LtUVecI8x16'] = Module['_BinaryenLtUVecI8x16']();
+Module['GtSVecI8x16'] = Module['_BinaryenGtSVecI8x16']();
+Module['GtUVecI8x16'] = Module['_BinaryenGtUVecI8x16']();
+Module['LeSVecI8x16'] = Module['_BinaryenLeSVecI8x16']();
+Module['LeUVecI8x16'] = Module['_BinaryenLeUVecI8x16']();
+Module['GeSVecI8x16'] = Module['_BinaryenGeSVecI8x16']();
+Module['GeUVecI8x16'] = Module['_BinaryenGeUVecI8x16']();
+Module['EqVecI16x8'] = Module['_BinaryenEqVecI16x8']();
+Module['NeVecI16x8'] = Module['_BinaryenNeVecI16x8']();
+Module['LtSVecI16x8'] = Module['_BinaryenLtSVecI16x8']();
+Module['LtUVecI16x8'] = Module['_BinaryenLtUVecI16x8']();
+Module['GtSVecI16x8'] = Module['_BinaryenGtSVecI16x8']();
+Module['GtUVecI16x8'] = Module['_BinaryenGtUVecI16x8']();
+Module['LeSVecI16x8'] = Module['_BinaryenLeSVecI16x8']();
+Module['LeUVecI16x8'] = Module['_BinaryenLeUVecI16x8']();
+Module['GeSVecI16x8'] = Module['_BinaryenGeSVecI16x8']();
+Module['GeUVecI16x8'] = Module['_BinaryenGeUVecI16x8']();
+Module['EqVecI32x4'] = Module['_BinaryenEqVecI32x4']();
+Module['NeVecI32x4'] = Module['_BinaryenNeVecI32x4']();
+Module['LtSVecI32x4'] = Module['_BinaryenLtSVecI32x4']();
+Module['LtUVecI32x4'] = Module['_BinaryenLtUVecI32x4']();
+Module['GtSVecI32x4'] = Module['_BinaryenGtSVecI32x4']();
+Module['GtUVecI32x4'] = Module['_BinaryenGtUVecI32x4']();
+Module['LeSVecI32x4'] = Module['_BinaryenLeSVecI32x4']();
+Module['LeUVecI32x4'] = Module['_BinaryenLeUVecI32x4']();
+Module['GeSVecI32x4'] = Module['_BinaryenGeSVecI32x4']();
+Module['GeUVecI32x4'] = Module['_BinaryenGeUVecI32x4']();
+Module['EqVecF32x4'] = Module['_BinaryenEqVecF32x4']();
+Module['NeVecF32x4'] = Module['_BinaryenNeVecF32x4']();
+Module['LtVecF32x4'] = Module['_BinaryenLtVecF32x4']();
+Module['GtVecF32x4'] = Module['_BinaryenGtVecF32x4']();
+Module['LeVecF32x4'] = Module['_BinaryenLeVecF32x4']();
+Module['GeVecF32x4'] = Module['_BinaryenGeVecF32x4']();
+Module['EqVecF64x2'] = Module['_BinaryenGeVecF32x4']();
+Module['NeVecF64x2'] = Module['_BinaryenNeVecF64x2']();
+Module['LtVecF64x2'] = Module['_BinaryenLtVecF64x2']();
+Module['GtVecF64x2'] = Module['_BinaryenGtVecF64x2']();
+Module['LeVecF64x2'] = Module['_BinaryenLeVecF64x2']();
+Module['GeVecF64x2'] = Module['_BinaryenGeVecF64x2']();
+Module['NotVec128'] = Module['_BinaryenNotVec128']();
+Module['AndVec128'] = Module['_BinaryenAndVec128']();
+Module['OrVec128'] = Module['_BinaryenOrVec128']();
+Module['XorVec128'] = Module['_BinaryenXorVec128']();
+Module['NegVecI8x16'] = Module['_BinaryenNegVecI8x16']();
+Module['AnyTrueVecI8x16'] = Module['_BinaryenAnyTrueVecI8x16']();
+Module['AllTrueVecI8x16'] = Module['_BinaryenAllTrueVecI8x16']();
+Module['ShlVecI8x16'] = Module['_BinaryenShlVecI8x16']();
+Module['ShrSVecI8x16'] = Module['_BinaryenShrSVecI8x16']();
+Module['ShrUVecI8x16'] = Module['_BinaryenShrUVecI8x16']();
+Module['AddVecI8x16'] = Module['_BinaryenAddVecI8x16']();
+Module['AddSatSVecI8x16'] = Module['_BinaryenAddSatSVecI8x16']();
+Module['AddSatUVecI8x16'] = Module['_BinaryenAddSatUVecI8x16']();
+Module['SubVecI8x16'] = Module['_BinaryenSubVecI8x16']();
+Module['SubSatSVecI8x16'] = Module['_BinaryenSubSatSVecI8x16']();
+Module['SubSatUVecI8x16'] = Module['_BinaryenSubSatUVecI8x16']();
+Module['MulVecI8x16'] = Module['_BinaryenMulVecI8x16']();
+Module['NegVecI16x8'] = Module['_BinaryenNegVecI16x8']();
+Module['AnyTrueVecI16x8'] = Module['_BinaryenAnyTrueVecI16x8']();
+Module['AllTrueVecI16x8'] = Module['_BinaryenAllTrueVecI16x8']();
+Module['ShlVecI16x8'] = Module['_BinaryenShlVecI16x8']();
+Module['ShrSVecI16x8'] = Module['_BinaryenShrSVecI16x8']();
+Module['ShrUVecI16x8'] = Module['_BinaryenShrUVecI16x8']();
+Module['AddVecI16x8'] = Module['_BinaryenAddVecI16x8']();
+Module['AddSatSVecI16x8'] = Module['_BinaryenAddSatSVecI16x8']();
+Module['AddSatUVecI16x8'] = Module['_BinaryenAddSatUVecI16x8']();
+Module['SubVecI16x8'] = Module['_BinaryenSubVecI16x8']();
+Module['SubSatSVecI16x8'] = Module['_BinaryenSubSatSVecI16x8']();
+Module['SubSatUVecI16x8'] = Module['_BinaryenSubSatUVecI16x8']();
+Module['MulVecI16x8'] = Module['_BinaryenMulVecI16x8']();
+Module['NegVecI32x4'] = Module['_BinaryenNegVecI32x4']();
+Module['AnyTrueVecI32x4'] = Module['_BinaryenAnyTrueVecI32x4']();
+Module['AllTrueVecI32x4'] = Module['_BinaryenAllTrueVecI32x4']();
+Module['ShlVecI32x4'] = Module['_BinaryenShlVecI32x4']();
+Module['ShrSVecI32x4'] = Module['_BinaryenShrSVecI32x4']();
+Module['ShrUVecI32x4'] = Module['_BinaryenShrUVecI32x4']();
+Module['AddVecI32x4'] = Module['_BinaryenAddVecI32x4']();
+Module['SubVecI32x4'] = Module['_BinaryenSubVecI32x4']();
+Module['MulVecI32x4'] = Module['_BinaryenMulVecI32x4']();
+Module['NegVecI64x2'] = Module['_BinaryenNegVecI64x2']();
+Module['AnyTrueVecI64x2'] = Module['_BinaryenAnyTrueVecI64x2']();
+Module['AllTrueVecI64x2'] = Module['_BinaryenAllTrueVecI64x2']();
+Module['ShlVecI64x2'] = Module['_BinaryenShlVecI64x2']();
+Module['ShrSVecI64x2'] = Module['_BinaryenShrSVecI64x2']();
+Module['ShrUVecI64x2'] = Module['_BinaryenShrUVecI64x2']();
+Module['AddVecI64x2'] = Module['_BinaryenAddVecI64x2']();
+Module['SubVecI64x2'] = Module['_BinaryenSubVecI64x2']();
+Module['AbsVecF32x4'] = Module['_BinaryenAbsVecF32x4']();
+Module['NegVecF32x4'] = Module['_BinaryenNegVecF32x4']();
+Module['SqrtVecF32x4'] = Module['_BinaryenSqrtVecF32x4']();
+Module['AddVecF32x4'] = Module['_BinaryenAddVecF32x4']();
+Module['SubVecF32x4'] = Module['_BinaryenSubVecF32x4']();
+Module['MulVecF32x4'] = Module['_BinaryenMulVecF32x4']();
+Module['DivVecF32x4'] = Module['_BinaryenDivVecF32x4']();
+Module['MinVecF32x4'] = Module['_BinaryenMinVecF32x4']();
+Module['MaxVecF32x4'] = Module['_BinaryenMaxVecF32x4']();
+Module['AbsVecF64x2'] = Module['_BinaryenAbsVecF64x2']();
+Module['NegVecF64x2'] = Module['_BinaryenNegVecF64x2']();
+Module['SqrtVecF64x2'] = Module['_BinaryenSqrtVecF64x2']();
+Module['AddVecF64x2'] = Module['_BinaryenAddVecF64x2']();
+Module['SubVecF64x2'] = Module['_BinaryenSubVecF64x2']();
+Module['MulVecF64x2'] = Module['_BinaryenMulVecF64x2']();
+Module['DivVecF64x2'] = Module['_BinaryenDivVecF64x2']();
+Module['MinVecF64x2'] = Module['_BinaryenMinVecF64x2']();
+Module['MaxVecF64x2'] = Module['_BinaryenMaxVecF64x2']();
+Module['TruncSatSVecF32x4ToVecI32x4'] = Module['_BinaryenTruncSatSVecF32x4ToVecI32x4']();
+Module['TruncSatUVecF32x4ToVecI32x4'] = Module['_BinaryenTruncSatUVecF32x4ToVecI32x4']();
+Module['TruncSatSVecF64x2ToVecI64x2'] = Module['_BinaryenTruncSatSVecF64x2ToVecI64x2']();
+Module['TruncSatUVecF64x2ToVecI64x2'] = Module['_BinaryenTruncSatUVecF64x2ToVecI64x2']();
+Module['ConvertSVecI32x4ToVecF32x4'] = Module['_BinaryenConvertSVecI32x4ToVecF32x4']();
+Module['ConvertUVecI32x4ToVecF32x4'] = Module['_BinaryenConvertUVecI32x4ToVecF32x4']();
+Module['ConvertSVecI64x2ToVecF64x2'] = Module['_BinaryenConvertSVecI64x2ToVecF64x2']();
+Module['ConvertUVecI64x2ToVecF64x2'] = Module['_BinaryenConvertUVecI64x2ToVecF64x2']();
 
 // 'Module' interface
 Module['Module'] = function(module) {
-  if (!module) module = Module['_BinaryenModuleCreate']();
-  this['ptr'] = module;
+  assert(!module); // guard against incorrect old API usage
+  var module = Module['_BinaryenModuleCreate']();
+
+  wrapModule(module, this);
+};
+
+// Receives a C pointer to a C Module and a JS object, and creates
+// the JS wrappings on the object to access the C data.
+// This is meant for internal use only, and is necessary as we
+// want to access Module from JS that were perhaps not created
+// from JS.
+function wrapModule(module, self) {
+  assert(module); // guard against incorrect old API usage
+  if (!self) self = {};
+
+  self['ptr'] = module;
 
   // 'Expression' creation
-  this['block'] = function(name, children, type) {
+  self['block'] = function(name, children, type) {
     return preserveStack(function() {
       return Module['_BinaryenBlock'](module, name ? strToStack(name) : 0,
                                       i32sToStack(children), children.length,
                                       typeof type !== 'undefined' ? type : Module['none']);
     });
   };
-  this['if'] = function(condition, ifTrue, ifFalse) {
+  self['if'] = function(condition, ifTrue, ifFalse) {
     return Module['_BinaryenIf'](module, condition, ifTrue, ifFalse);
   };
-  this['loop'] = function(label, body) {
+  self['loop'] = function(label, body) {
     return preserveStack(function() {
       return Module['_BinaryenLoop'](module, strToStack(label), body);
     });
   };
-  this['break'] = this['br'] = function(label, condition, value) {
+  self['break'] = self['br'] = function(label, condition, value) {
     return preserveStack(function() {
       return Module['_BinaryenBreak'](module, strToStack(label), condition, value);
     });
   };
-  this['br_if'] = function(label, condition, value) {
-    assert(condition);
-    return this['br'](label, condition, value);
+  self['br_if'] = function(label, condition, value) {
+    return self['br'](label, condition, value);
   };
-  this['switch'] = function(names, defaultName, condition, value) {
+  self['switch'] = function(names, defaultName, condition, value) {
     return preserveStack(function() {
       var namei32s = [];
       names.forEach(function(name) {
@@ -244,35 +414,49 @@ Module['Module'] = function(module) {
                                        strToStack(defaultName), condition, value);
     });
   };
-  this['call'] = function(name, operands, type) {
+  self['call'] = function(name, operands, type) {
     return preserveStack(function() {
       return Module['_BinaryenCall'](module, strToStack(name), i32sToStack(operands), operands.length, type);
     });
   };
-  this['callIndirect'] = this['call_indirect'] = function(target, operands, type) {
+  self['callIndirect'] = self['call_indirect'] = function(target, operands, type) {
     return preserveStack(function() {
       return Module['_BinaryenCallIndirect'](module, target, i32sToStack(operands), operands.length, strToStack(type));
     });
   };
-  this['getLocal'] = this['get_local'] = function(index, type) {
-    return Module['_BinaryenGetLocal'](module, index, type);
-  };
-  this['setLocal'] = this['set_local'] = this['set_local'] = function(index, value) {
-    return Module['_BinaryenSetLocal'](module, index, value);
-  };
-  this['teeLocal'] = this['tee_local'] = function(index, value) {
-    return Module['_BinaryenTeeLocal'](module, index, value);
-  };
-  this['getGlobal'] = this['get_global'] = function(name, type) {
-    return Module['_BinaryenGetGlobal'](module, strToStack(name), type);
+
+  self['local'] = {
+    'get': function(index, type) {
+      return Module['_BinaryenGetLocal'](module, index, type);
+    },
+    'set': function(index, value) {
+      return Module['_BinaryenSetLocal'](module, index, value);
+    },
+    'tee': function(index, value) {
+      return Module['_BinaryenTeeLocal'](module, index, value);
+    }
   }
-  this['setGlobal'] = this['set_global'] = function(name, value) {
-    return Module['_BinaryenSetGlobal'](module, strToStack(name), value);
+
+  self['getLocal'] = self['local']['get'];
+  self['setLocal'] = self['local']['set'];
+  self['teeLocal'] = self['local']['tee'];
+
+  self['global'] = {
+    'get': function(name, type) {
+      return Module['_BinaryenGetGlobal'](module, strToStack(name), type);
+    },
+    'set': function(name, value) {
+      return Module['_BinaryenSetGlobal'](module, strToStack(name), value);
+    }
   }
-  this['currentMemory'] = this['current_memory'] = function() {
+
+  self['getGlobal'] = self['global']['get'];
+  self['setGlobal'] = self['global']['set'];
+
+  self['currentMemory'] = self['current_memory'] = function() {
     return Module['_BinaryenHost'](module, Module['CurrentMemory']);
   }
-  this['growMemory'] = this['grow_memory'] = function(value) {
+  self['growMemory'] = self['grow_memory'] = function(value) {
     return Module['_BinaryenHost'](module, Module['GrowMemory'], null, i32sToStack([value]), 1);
   }
 
@@ -283,7 +467,7 @@ Module['Module'] = function(module) {
   var temp = _malloc(16); // a single literal in memory. the LLVM C ABI
                           // makes us pass pointers to this.
 
-  this['i32'] = {
+  self['i32'] = {
     'load': function(offset, align, ptr) {
       return Module['_BinaryenLoad'](module, 4, true, offset, align, Module['i32'], ptr);
     },
@@ -338,6 +522,22 @@ Module['Module'] = function(module) {
       },
       'f64': function(value) {
         return Module['_BinaryenUnary'](module, Module['TruncUFloat64ToInt32'], value);
+      },
+    },
+    'trunc_s_sat': {
+      'f32': function(value) {
+        return Module['_BinaryenUnary'](module, Module['TruncSatSFloat32ToInt32'], value);
+      },
+      'f64': function(value) {
+        return Module['_BinaryenUnary'](module, Module['TruncSatSFloat64ToInt32'], value);
+      },
+    },
+    'trunc_u_sat': {
+      'f32': function(value) {
+        return Module['_BinaryenUnary'](module, Module['TruncSatUFloat32ToInt32'], value);
+      },
+      'f64': function(value) {
+        return Module['_BinaryenUnary'](module, Module['TruncSatUFloat64ToInt32'], value);
       },
     },
     'reinterpret': function(value) {
@@ -521,7 +721,7 @@ Module['Module'] = function(module) {
     },
   };
 
-  this['i64'] = {
+  self['i64'] = {
     'load': function(offset, align, ptr) {
       return Module['_BinaryenLoad'](module, 8, true, offset, align, Module['i64'], ptr);
     },
@@ -585,6 +785,22 @@ Module['Module'] = function(module) {
       },
       'f64': function(value) {
         return Module['_BinaryenUnary'](module, Module['TruncUFloat64ToInt64'], value);
+      },
+    },
+    'trunc_s_sat': {
+      'f32': function(value) {
+        return Module['_BinaryenUnary'](module, Module['TruncSatSFloat32ToInt64'], value);
+      },
+      'f64': function(value) {
+        return Module['_BinaryenUnary'](module, Module['TruncSatSFloat64ToInt64'], value);
+      },
+    },
+    'trunc_u_sat': {
+      'f32': function(value) {
+        return Module['_BinaryenUnary'](module, Module['TruncSatUFloat32ToInt64'], value);
+      },
+      'f64': function(value) {
+        return Module['_BinaryenUnary'](module, Module['TruncSatUFloat64ToInt64'], value);
       },
     },
     'reinterpret': function(value) {
@@ -803,7 +1019,7 @@ Module['Module'] = function(module) {
     },
   };
 
-  this['f32'] = {
+  self['f32'] = {
     'load': function(offset, align, ptr) {
       return Module['_BinaryenLoad'](module, 4, true, offset, align, Module['f32'], ptr);
     },
@@ -902,7 +1118,7 @@ Module['Module'] = function(module) {
     },
   };
 
-  this['f64'] = {
+  self['f64'] = {
     'load': function(offset, align, ptr) {
       return Module['_BinaryenLoad'](module, 8, true, offset, align, Module['f64'], ptr);
     },
@@ -1001,123 +1217,572 @@ Module['Module'] = function(module) {
     },
   };
 
-  this['select'] = function(condition, ifTrue, ifFalse) {
+  self['v128'] = {
+    'load': function(offset, align, ptr) {
+      return Module['_BinaryenLoad'](module, 16, false, offset, align, Module['v128'], ptr);
+    },
+    'store': function(offset, align, ptr, value) {
+      return Module['_BinaryenStore'](module, 16, offset, align, ptr, value, Module['v128']);
+    },
+    'const': function(i8s) {
+      return preserveStack(function() {
+        Module['_BinaryenLiteralVec128'](temp, i8sToStack(i8s));
+        return Module['_BinaryenConst'](module, temp);
+      });
+    },
+    'not': function(value) {
+      return Module['_BinaryenUnary'](module, Module['NotVec128'], value);
+    },
+    'and': function(value) {
+      return Module['_BinaryenUnary'](module, Module['AndVec128'], value);
+    },
+    'or': function(value) {
+      return Module['_BinaryenUnary'](module, Module['OrVec128'], value);
+    },
+    'xor': function(value) {
+      return Module['_BinaryenUnary'](module, Module['XorVec128'], value);
+    },
+    'bitselect': function(left, right, cond) {
+      return Module['_BinaryenSIMDBitselect'](module, left, right, cond);
+    }
+  };
+
+  self['v8x16'] = {
+    'shuffle': function(left, right, mask) {
+      return preserveStack(function() {
+        return Module['_BinaryenSIMDShuffle'](module, left, right, i8sToStack(mask));
+      });
+    },
+  };
+
+  self['i8x16'] = {
+    'splat': function(value) {
+      return Module['_BinaryenUnary'](module, Module['SplatVecI8x16'], value);
+    },
+    'extract_lane_s': function(vec, index) {
+      return Module['_BinaryenSIMDExtract'](module, Module['ExtractLaneSVecI8x16'], vec, index);
+    },
+    'extract_lane_u': function(vec, index) {
+      return Module['_BinaryenSIMDExtract'](module, Module['ExtractLaneUVecI8x16'], vec, index);
+    },
+    'replace_lane': function(vec, index, value) {
+      return Module['_BinaryenSIMDReplace'](module, Module['ReplaceLaneVecI8x16'], vec, index, value);
+    },
+    'eq': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['EqVecI8x16'], left, right);
+    },
+    'ne': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['NeVecI8x16'], left, right);
+    },
+    'lt_s': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['LtSVecI8x16'], left, right);
+    },
+    'lt_u': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['LtUVecI8x16'], left, right);
+    },
+    'gt_s': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['GtSVecI8x16'], left, right);
+    },
+    'gt_u': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['GtUVecI8x16'], left, right);
+    },
+    'le_s': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['LeSVecI8x16'], left, right);
+    },
+    'le_u': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['LeUVecI8x16'], left, right);
+    },
+    'ge_s': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['GeSVecI8x16'], left, right);
+    },
+    'ge_u': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['GeUVecI8x16'], left, right);
+    },
+    'neg': function(value) {
+      return Module['_BinaryenUnary'](module, Module['NegVecI8x16'], value);
+    },
+    'any_true': function(value) {
+      return Module['_BinaryenUnary'](module, Module['AnyTrueVecI8x16'], value);
+    },
+    'all_true': function(value) {
+      return Module['_BinaryenUnary'](module, Module['AllTrueVecI8x16'], value);
+    },
+    'shl': function(vec, shift) {
+      return Module['_BinaryenSIMDShift'](module, Module['ShlVecI8x16'], vec, shift);
+    },
+    'shr_s': function(vec, shift) {
+      return Module['_BinaryenSIMDShift'](module, Module['ShrSVecI8x16'], vec, shift);
+    },
+    'shr_u': function(vec, shift) {
+      return Module['_BinaryenSIMDShift'](module, Module['ShrUVecI8x16'], vec, shift);
+    },
+    'add': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['AddVecI8x16'], left, right);
+    },
+    'add_saturate_s': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['AddSatSVecI8x16'], left, right);
+    },
+    'add_saturate_u': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['AddSatUVecI8x16'], left, right);
+    },
+    'sub': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['SubVecI8x16'], left, right);
+    },
+    'sub_saturate_s': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['SubSatSVecI8x16'], left, right);
+    },
+    'sub_saturate_u': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['SubSatUVecI8x16'], left, right);
+    },
+    'mul': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['MulVecI8x16'], left, right);
+    },
+  };
+
+  self['i16x8'] = {
+    'splat': function(value) {
+      return Module['_BinaryenUnary'](module, Module['SplatVecI16x8'], value);
+    },
+    'extract_lane_s': function(vec, index) {
+      return Module['_BinaryenSIMDExtract'](module, Module['ExtractLaneSVecI16x8'], vec, index);
+    },
+    'extract_lane_u': function(vec, index) {
+      return Module['_BinaryenSIMDExtract'](module, Module['ExtractLaneUVecI16x8'], vec, index);
+    },
+    'replace_lane': function(vec, index, value) {
+      return Module['_BinaryenSIMDReplace'](module, Module['ReplaceLaneVecI16x8'], vec, index, value);
+    },
+    'eq': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['EqVecI16x8'], left, right);
+    },
+    'ne': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['NeVecI16x8'], left, right);
+    },
+    'lt_s': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['LtSVecI16x8'], left, right);
+    },
+    'lt_u': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['LtUVecI16x8'], left, right);
+    },
+    'gt_s': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['GtSVecI16x8'], left, right);
+    },
+    'gt_u': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['GtUVecI16x8'], left, right);
+    },
+    'le_s': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['LeSVecI16x8'], left, right);
+    },
+    'le_u': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['LeUVecI16x8'], left, right);
+    },
+    'ge_s': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['GeSVecI16x8'], left, right);
+    },
+    'ge_u': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['GeUVecI16x8'], left, right);
+    },
+    'neg': function(value) {
+      return Module['_BinaryenUnary'](module, Module['NegVecI16x8'], value);
+    },
+    'any_true': function(value) {
+      return Module['_BinaryenUnary'](module, Module['AnyTrueVecI16x8'], value);
+    },
+    'all_true': function(value) {
+      return Module['_BinaryenUnary'](module, Module['AllTrueVecI16x8'], value);
+    },
+    'shl': function(vec, shift) {
+      return Module['_BinaryenSIMDShift'](module, Module['ShlVecI16x8'], vec, shift);
+    },
+    'shr_s': function(vec, shift) {
+      return Module['_BinaryenSIMDShift'](module, Module['ShrSVecI16x8'], vec, shift);
+    },
+    'shr_u': function(vec, shift) {
+      return Module['_BinaryenSIMDShift'](module, Module['ShrUVecI16x8'], vec, shift);
+    },
+    'add': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['AddVecI16x8'], left, right);
+    },
+    'add_saturate_s': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['AddSatSVecI16x8'], left, right);
+    },
+    'add_saturate_u': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['AddSatUVecI16x8'], left, right);
+    },
+    'sub': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['SubVecI16x8'], left, right);
+    },
+    'sub_saturate_s': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['SubSatSVecI16x8'], left, right);
+    },
+    'sub_saturate_u': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['SubSatUVecI16x8'], left, right);
+    },
+    'mul': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['MulVecI16x8'], left, right);
+    },
+  };
+
+  self['i32x4'] = {
+    'splat': function(value) {
+      return Module['_BinaryenUnary'](module, Module['SplatVecI32x4'], value);
+    },
+    'extract_lane': function(vec, index) {
+      return Module['_BinaryenSIMDExtract'](module, Module['ExtractLaneVecI32x4'], vec, index);
+    },
+    'replace_lane': function(vec, index, value) {
+      return Module['_BinaryenSIMDReplace'](module, Module['ReplaceLaneVecI32x4'], vec, index, value);
+    },
+    'eq': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['EqVecI32x4'], left, right);
+    },
+    'ne': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['NeVecI32x4'], left, right);
+    },
+    'lt_s': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['LtSVecI32x4'], left, right);
+    },
+    'lt_u': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['LtUVecI32x4'], left, right);
+    },
+    'gt_s': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['GtSVecI32x4'], left, right);
+    },
+    'gt_u': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['GtUVecI32x4'], left, right);
+    },
+    'le_s': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['LeSVecI32x4'], left, right);
+    },
+    'le_u': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['LeUVecI32x4'], left, right);
+    },
+    'ge_s': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['GeSVecI32x4'], left, right);
+    },
+    'ge_u': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['GeUVecI32x4'], left, right);
+    },
+    'neg': function(value) {
+      return Module['_BinaryenUnary'](module, Module['NegVecI32x4'], value);
+    },
+    'any_true': function(value) {
+      return Module['_BinaryenUnary'](module, Module['AnyTrueVecI32x4'], value);
+    },
+    'all_true': function(value) {
+      return Module['_BinaryenUnary'](module, Module['AllTrueVecI32x4'], value);
+    },
+    'shl': function(vec, shift) {
+      return Module['_BinaryenSIMDShift'](module, Module['ShlVecI32x4'], vec, shift);
+    },
+    'shr_s': function(vec, shift) {
+      return Module['_BinaryenSIMDShift'](module, Module['ShrSVecI32x4'], vec, shift);
+    },
+    'shr_u': function(vec, shift) {
+      return Module['_BinaryenSIMDShift'](module, Module['ShrUVecI32x4'], vec, shift);
+    },
+    'add': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['AddVecI32x4'], left, right);
+    },
+    'sub': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['SubVecI32x4'], left, right);
+    },
+    'mul': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['MulVecI32x4'], left, right);
+    },
+    'trunc_s/f32x4:sat': function(value) {
+      return Module['_BinaryenUnary'](module, Module['TruncSatSVecF32x4ToVecI32x4'], value);
+    },
+    'trunc_u/f32x4:sat': function(value) {
+      return Module['_BinaryenUnary'](module, Module['TruncSatUVecF32x4ToVecI32x4'], value);
+    },
+  };
+
+  self['i64x2'] = {
+    'splat': function(value) {
+      return Module['_BinaryenUnary'](module, Module['SplatVecI64x2'], value);
+    },
+    'extract_lane': function(vec, index) {
+      return Module['_BinaryenSIMDExtract'](module, Module['ExtractLaneVecI64x2'], vec, index);
+    },
+    'replace_lane': function(vec, index, value) {
+      return Module['_BinaryenSIMDReplace'](module, Module['ReplaceLaneVecI64x2'], vec, index, value);
+    },
+    'neg': function(value) {
+      return Module['_BinaryenUnary'](module, Module['NegVecI64x2'], value);
+    },
+    'any_true': function(value) {
+      return Module['_BinaryenUnary'](module, Module['AnyTrueVecI64x2'], value);
+    },
+    'all_true': function(value) {
+      return Module['_BinaryenUnary'](module, Module['AllTrueVecI64x2'], value);
+    },
+    'shl': function(vec, shift) {
+      return Module['_BinaryenSIMDShift'](module, Module['ShlVecI64x2'], vec, shift);
+    },
+    'shr_s': function(vec, shift) {
+      return Module['_BinaryenSIMDShift'](module, Module['ShrSVecI64x2'], vec, shift);
+    },
+    'shr_u': function(vec, shift) {
+      return Module['_BinaryenSIMDShift'](module, Module['ShrUVecI64x2'], vec, shift);
+    },
+    'add': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['AddVecI64x2'], left, right);
+    },
+    'sub': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['SubVecI64x2'], left, right);
+    },
+    'trunc_s/f64x2:sat': function(value) {
+      return Module['_BinaryenUnary'](module, Module['TruncSatSVecF64x2ToVecI64x2'], value);
+    },
+    'trunc_u/f64x2:sat': function(value) {
+      return Module['_BinaryenUnary'](module, Module['TruncSatUVecF64x2ToVecI64x2'], value);
+    },
+  };
+
+  self['f32x4'] = {
+    'splat': function(value) {
+      return Module['_BinaryenUnary'](module, Module['SplatVecF32x4'], value);
+    },
+    'extract_lane': function(vec, index) {
+      return Module['_BinaryenSIMDExtract'](module, Module['ExtractLaneVecF32x4'], vec, index);
+    },
+    'replace_lane': function(vec, index, value) {
+      return Module['_BinaryenSIMDReplace'](module, Module['ReplaceLaneVecF32x4'], vec, index, value);
+    },
+    'eq': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['EqVecF32x4'], left, right);
+    },
+    'ne': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['NeVecF32x4'], left, right);
+    },
+    'lt': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['LtVecF32x4'], left, right);
+    },
+    'gt': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['GtVecF32x4'], left, right);
+    },
+    'le': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['LeVecF32x4'], left, right);
+    },
+    'ge': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['GeVecF32x4'], left, right);
+    },
+    'abs': function(value) {
+      return Module['_BinaryenUnary'](module, Module['AbsVecF32x4'], value);
+    },
+    'neg': function(value) {
+      return Module['_BinaryenUnary'](module, Module['NegVecF32x4'], value);
+    },
+    'sqrt': function(value) {
+      return Module['_BinaryenUnary'](module, Module['SqrtVecF32x4'], value);
+    },
+    'add': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['AddVecF32x4'], left, right);
+    },
+    'sub': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['SubVecF32x4'], left, right);
+    },
+    'mul': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['MulVecF32x4'], left, right);
+    },
+    'div': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['DivVecF32x4'], left, right);
+    },
+    'min': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['MinVecF32x4'], left, right);
+    },
+    'max': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['MaxVecF32x4'], left, right);
+    },
+    'convert_s/i32x4': function(value) {
+      return Module['_BinaryenUnary'](module, Module['ConvertSVecI32x4ToVecF32x4'], value);
+    },
+    'convert_u/i32x4': function(value) {
+      return Module['_BinaryenUnary'](module, Module['ConvertUVecI32x4ToVecF32x4'], value);
+    },
+  };
+
+  self['f64x2'] = {
+    'splat': function(value) {
+      return Module['_BinaryenUnary'](module, Module['SplatVecF64x2'], value);
+    },
+    'extract_lane': function(vec, index) {
+      return Module['_BinaryenSIMDExtract'](module, Module['ExtractLaneVecF64x2'], vec, index);
+    },
+    'replace_lane': function(vec, index, value) {
+      return Module['_BinaryenSIMDReplace'](module, Module['ReplaceLaneVecF64x2'], vec, index, value);
+    },
+    'eq': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['EqVecF64x2'], left, right);
+    },
+    'ne': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['NeVecF64x2'], left, right);
+    },
+    'lt': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['LtVecF64x2'], left, right);
+    },
+    'gt': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['GtVecF64x2'], left, right);
+    },
+    'le': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['LeVecF64x2'], left, right);
+    },
+    'ge': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['GeVecF64x2'], left, right);
+    },
+    'abs': function(value) {
+      return Module['_BinaryenUnary'](module, Module['AbsVecF64x2'], value);
+    },
+    'neg': function(value) {
+      return Module['_BinaryenUnary'](module, Module['NegVecF64x2'], value);
+    },
+    'sqrt': function(value) {
+      return Module['_BinaryenUnary'](module, Module['SqrtVecF64x2'], value);
+    },
+    'add': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['AddVecF64x2'], left, right);
+    },
+    'sub': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['SubVecF64x2'], left, right);
+    },
+    'mul': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['MulVecF64x2'], left, right);
+    },
+    'div': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['DivVecF64x2'], left, right);
+    },
+    'min': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['MinVecF64x2'], left, right);
+    },
+    'max': function(left, right) {
+      return Module['_BinaryenBinary'](module, Module['MaxVecF64x2'], left, right);
+    },
+    'convert_s/i64x2': function(value) {
+      return Module['_BinaryenUnary'](module, Module['ConvertSVecI64x2ToVecF64x2'], value);
+    },
+    'convert_u/i64x2': function(value) {
+      return Module['_BinaryenUnary'](module, Module['ConvertUVecI64x2ToVecF64x2'], value);
+    },
+  };
+
+  self['select'] = function(condition, ifTrue, ifFalse) {
     return Module['_BinaryenSelect'](module, condition, ifTrue, ifFalse);
   };
-  this['drop'] = function(value) {
+  self['drop'] = function(value) {
     return Module['_BinaryenDrop'](module, value);
   };
-  this['return'] = function(value) {
+  self['return'] = function(value) {
     return Module['_BinaryenReturn'](module, value);
   };
-  this['host'] = function(op, name, operands) {
+  self['host'] = function(op, name, operands) {
     if (!operands) operands = [];
     return preserveStack(function() {
       return Module['_BinaryenHost'](module, op, strToStack(name), i32sToStack(operands), operands.length);
     });
   };
-  this['nop'] = function() {
+  self['nop'] = function() {
     return Module['_BinaryenNop'](module);
   };
-  this['unreachable'] = function() {
+  self['unreachable'] = function() {
     return Module['_BinaryenUnreachable'](module);
   };
-  this['wake'] = function(ptr, wakeCount) {
+  self['wake'] = function(ptr, wakeCount) {
     return Module['_BinaryenAtomicWake'](module, ptr, wakeCount);
   };
 
   // 'Module' operations
-  this['addFunctionType'] = function(name, result, paramTypes) {
+  self['addFunctionType'] = function(name, result, paramTypes) {
     if (!paramTypes) paramTypes = [];
     return preserveStack(function() {
       return Module['_BinaryenAddFunctionType'](module, strToStack(name), result,
                                                 i32sToStack(paramTypes), paramTypes.length);
     });
   };
-  this['getFunctionTypeBySignature'] = function(result, paramTypes) {
+  self['getFunctionTypeBySignature'] = function(result, paramTypes) {
     if (!paramTypes) paramTypes = [];
     return preserveStack(function() {
       return Module['_BinaryenGetFunctionTypeBySignature'](module, result,
                                                            i32sToStack(paramTypes), paramTypes.length);
     });
   };
-  this['removeFunctionType'] = function(name) {
+  self['removeFunctionType'] = function(name) {
     return preserveStack(function () {
       return Module['_BinaryenRemoveFunctionType'](module, strToStack(name));
     });
   };
-  this['addFunction'] = function(name, functionType, varTypes, body) {
+  self['addFunction'] = function(name, functionType, varTypes, body) {
     return preserveStack(function() {
       return Module['_BinaryenAddFunction'](module, strToStack(name), functionType, i32sToStack(varTypes), varTypes.length, body);
     });
   };
-  this['getFunction'] = function(name) {
+  self['getFunction'] = function(name) {
     return preserveStack(function() {
       return Module['_BinaryenGetFunction'](module, strToStack(name));
     });
   };
-  this['removeFunction'] = function(name) {
+  self['removeFunction'] = function(name) {
     return preserveStack(function() {
       return Module['_BinaryenRemoveFunction'](module, strToStack(name));
     });
   };
-  this['addGlobal'] = function(name, type, mutable, init) {
+  self['addGlobal'] = function(name, type, mutable, init) {
     return preserveStack(function() {
       return Module['_BinaryenAddGlobal'](module, strToStack(name), type, mutable, init);
     });
   }
-  this['removeGlobal'] = function(name) {
+  self['removeGlobal'] = function(name) {
     return preserveStack(function () {
       return Module['_BinaryenRemoveGlobal'](module, strToStack(name));
     });
   }
-  this['addFunctionImport'] = function(internalName, externalModuleName, externalBaseName, functionType) {
+  self['addFunctionImport'] = function(internalName, externalModuleName, externalBaseName, functionType) {
     return preserveStack(function() {
       return Module['_BinaryenAddFunctionImport'](module, strToStack(internalName), strToStack(externalModuleName), strToStack(externalBaseName), functionType);
     });
   };
-  this['addTableImport'] = function(internalName, externalModuleName, externalBaseName) {
+  self['addTableImport'] = function(internalName, externalModuleName, externalBaseName) {
     return preserveStack(function() {
       return Module['_BinaryenAddTableImport'](module, strToStack(internalName), strToStack(externalModuleName), strToStack(externalBaseName));
     });
   };
-  this['addMemoryImport'] = function(internalName, externalModuleName, externalBaseName, shared) {
+  self['addMemoryImport'] = function(internalName, externalModuleName, externalBaseName, shared) {
     return preserveStack(function() {
       return Module['_BinaryenAddMemoryImport'](module, strToStack(internalName), strToStack(externalModuleName), strToStack(externalBaseName), shared);
     });
   };
-  this['addGlobalImport'] = function(internalName, externalModuleName, externalBaseName, globalType) {
+  self['addGlobalImport'] = function(internalName, externalModuleName, externalBaseName, globalType) {
     return preserveStack(function() {
       return Module['_BinaryenAddGlobalImport'](module, strToStack(internalName), strToStack(externalModuleName), strToStack(externalBaseName), globalType);
     });
   };
-  this['addExport'] = // deprecated
-  this['addFunctionExport'] = function(internalName, externalName) {
+  self['addExport'] = // deprecated
+  self['addFunctionExport'] = function(internalName, externalName) {
     return preserveStack(function() {
       return Module['_BinaryenAddFunctionExport'](module, strToStack(internalName), strToStack(externalName));
     });
   };
-  this['addTableExport'] = function(internalName, externalName) {
+  self['addTableExport'] = function(internalName, externalName) {
     return preserveStack(function() {
       return Module['_BinaryenAddTableExport'](module, strToStack(internalName), strToStack(externalName));
     });
   };
-  this['addMemoryExport'] = function(internalName, externalName) {
+  self['addMemoryExport'] = function(internalName, externalName) {
     return preserveStack(function() {
       return Module['_BinaryenAddMemoryExport'](module, strToStack(internalName), strToStack(externalName));
     });
   };
-  this['addGlobalExport'] = function(internalName, externalName) {
+  self['addGlobalExport'] = function(internalName, externalName) {
     return preserveStack(function() {
       return Module['_BinaryenAddGlobalExport'](module, strToStack(internalName), strToStack(externalName));
     });
   };
-  this['removeExport'] = function(externalName) {
+  self['removeExport'] = function(externalName) {
     return preserveStack(function() {
       return Module['_BinaryenRemoveExport'](module, strToStack(externalName));
     });
   };
-  this['setFunctionTable'] = function(initial, maximum, funcNames) {
+  self['setFunctionTable'] = function(initial, maximum, funcNames) {
     return preserveStack(function() {
       return Module['_BinaryenSetFunctionTable'](module, initial, maximum,
         i32sToStack(funcNames.map(strToStack)),
@@ -1125,7 +1790,7 @@ Module['Module'] = function(module) {
       );
     });
   };
-  this['setMemory'] = function(initial, maximum, exportName, segments, shared) {
+  self['setMemory'] = function(initial, maximum, exportName, segments, shared) {
     // segments are assumed to be { offset: expression ref, data: array of 8-bit data }
     if (!segments) segments = [];
     return preserveStack(function() {
@@ -1151,10 +1816,10 @@ Module['Module'] = function(module) {
       );
     });
   };
-  this['setStart'] = function(start) {
+  self['setStart'] = function(start) {
     return Module['_BinaryenSetStart'](module, start);
   };
-  this['emitText'] = function() {
+  self['emitText'] = function() {
     var old = out;
     var ret = '';
     out = function(x) { ret += x + '\n' };
@@ -1162,7 +1827,17 @@ Module['Module'] = function(module) {
     out = old;
     return ret;
   };
-  this['emitAsmjs'] = function() {
+  self['emitStackIR'] = function(optimize) {
+    self['runPasses'](['generate-stack-ir']);
+    if (optimize) self['runPasses'](['optimize-stack-ir']);
+    var old = out;
+    var ret = '';
+    out = function(x) { ret += x + '\n' };
+    self['runPasses'](['print-stack-ir']);
+    out = old;
+    return ret;
+  };
+  self['emitAsmjs'] = function() {
     var old = out;
     var ret = '';
     out = function(x) { ret += x + '\n' };
@@ -1170,38 +1845,38 @@ Module['Module'] = function(module) {
     out = old;
     return ret;
   };
-  this['validate'] = function() {
+  self['validate'] = function() {
     return Module['_BinaryenModuleValidate'](module);
   };
-  this['optimize'] = function() {
+  self['optimize'] = function() {
     return Module['_BinaryenModuleOptimize'](module);
   };
-  this['optimizeFunction'] = function(func) {
-    if (typeof func === 'string') func = this['getFunction'](func);
+  self['optimizeFunction'] = function(func) {
+    if (typeof func === 'string') func = self['getFunction'](func);
     return Module['_BinaryenFunctionOptimize'](func, module);
   };
-  this['runPasses'] = function(passes) {
+  self['runPasses'] = function(passes) {
     return preserveStack(function() {
       return Module['_BinaryenModuleRunPasses'](module, i32sToStack(
         passes.map(strToStack)
       ), passes.length);
     });
   };
-  this['runPassesOnFunction'] = function(func, passes) {
-    if (typeof func === 'string') func = this['getFunction'](func);
+  self['runPassesOnFunction'] = function(func, passes) {
+    if (typeof func === 'string') func = self['getFunction'](func);
     return preserveStack(function() {
       return Module['_BinaryenFunctionRunPasses'](func, module, i32sToStack(
         passes.map(strToStack)
       ), passes.length);
     });
   };
-  this['autoDrop'] = function() {
+  self['autoDrop'] = function() {
     return Module['_BinaryenModuleAutoDrop'](module);
   };
-  this['dispose'] = function() {
+  self['dispose'] = function() {
     Module['_BinaryenModuleDispose'](module);
   };
-  this['emitBinary'] = function(sourceMapUrl) {
+  self['emitBinary'] = function(sourceMapUrl) {
     return preserveStack(function() {
       Module['_BinaryenModuleAllocateAndWrite'](temp, module, strToStack(sourceMapUrl));
       var binaryPtr    = HEAPU32[ temp >>> 2     ];
@@ -1219,26 +1894,30 @@ Module['Module'] = function(module) {
       }
     });
   };
-  this['interpret'] = function() {
+  self['interpret'] = function() {
     return Module['_BinaryenModuleInterpret'](module);
   };
-  this['addDebugInfoFileName'] = function(filename) {
+  self['addDebugInfoFileName'] = function(filename) {
     return preserveStack(function() {
       return Module['_BinaryenModuleAddDebugInfoFileName'](module, strToStack(filename));
     });
   };
-  this['getDebugInfoFileName'] = function(index) {
+  self['getDebugInfoFileName'] = function(index) {
     return Pointer_stringify(Module['_BinaryenModuleGetDebugInfoFileName'](module, index));
   };
-  this['setDebugLocation'] = function(func, expr, fileIndex, lineNumber, columnNumber) {
+  self['setDebugLocation'] = function(func, expr, fileIndex, lineNumber, columnNumber) {
     return Module['_BinaryenFunctionSetDebugLocation'](func, expr, fileIndex, lineNumber, columnNumber);
   };
-};
+
+  return self;
+}
+Module['wrapModule'] = wrapModule;
 
 // 'Relooper' interface
-Module['Relooper'] = function(relooper) {
-  if (!relooper) relooper = Module['_RelooperCreate']();
-  this.ptr = relooper;
+Module['Relooper'] = function(module) {
+  assert(module && typeof module === 'object' && module['ptr'] && module['block'] && module['if']); // guard against incorrect old API usage
+  var relooper = Module['_RelooperCreate'](module['ptr']);
+  this['ptr'] = relooper;
 
   this['addBlock'] = function(code) {
     return Module['_RelooperAddBlock'](relooper, code);
@@ -1254,8 +1933,8 @@ Module['Relooper'] = function(relooper) {
       return Module['_RelooperAddBranchForSwitch'](from, to, i32sToStack(indexes), indexes.length, code);
     });
   };
-  this['renderAndDispose'] = function(entry, labelHelper, module) {
-    return Module['_RelooperRenderAndDispose'](relooper, entry, labelHelper, module['ptr']);
+  this['renderAndDispose'] = function(entry, labelHelper) {
+    return Module['_RelooperRenderAndDispose'](relooper, entry, labelHelper);
   };
 };
 
@@ -1483,6 +2162,55 @@ Module['getExpressionInfo'] = function(expr) {
         'ptr': Module['_BinaryenAtomicWakeGetPtr'](expr),
         'wakeCount': Module['_BinaryenAtomicWakeGetWakeCount'](expr)
       };
+    case Module['SIMDExtractId']:
+      return {
+        'id': id,
+        'type': type,
+        'op': Module['_BinaryenSIMDExtractGetOp'](expr),
+        'vec': Module['_BinaryenSIMDExtractGetVec'](expr),
+        'index': Module['_BinaryenSIMDExtractGetIndex'](expr)
+      };
+    case Module['SIMDReplaceId']:
+      return {
+        'id': id,
+        'type': type,
+        'op': Module['_BinaryenSIMDReplaceGetOp'](expr),
+        'vec': Module['_BinaryenSIMDReplaceGetVec'](expr),
+        'index': Module['_BinaryenSIMDReplaceGetIndex'](expr),
+        'value': Module['_BinaryenSIMDReplaceGetValue'](expr)
+      };
+    case Module['SIMDShuffleId']:
+      return preserveStack(function() {
+        var ret = stackAlloc(16);
+        Module['_BinaryenSIMDShuffleGetMask'](expr, ret);
+        var mask = [];
+        for (var i = 0 ; i < 16; i++) {
+          mask[i] = HEAP8[ret + i];
+        }
+        return {
+          'id': id,
+          'type': type,
+          'left': Module['_BinaryenSIMDShuffleGetLeft'](expr),
+          'right': Module['_BinaryenSIMDShuffleGetRight'](expr),
+          'mask': mask
+        };
+      });
+    case Module['SIMDBitselectId']:
+      return {
+        'id': id,
+        'type': type,
+        'left': Module['_BinaryenSIMDBitselectGetLeft'](expr),
+        'right': Module['_BinaryenSIMDBitselectGetRight'](expr),
+        'cond': Module['_BinaryenSIMDBitselectGetCond'](expr)
+      };
+    case Module['SIMDShiftId']:
+      return {
+        'id': id,
+        'type': type,
+        'op': Module['_BinaryenSIMDShiftGetOp'](expr),
+        'vec': Module['_BinaryenSIMDShiftGetVec'](expr),
+        'shift': Module['_BinaryenSIMDShiftGetShift'](expr)
+      };
     default:
       throw Error('unexpected id: ' + id);
   }
@@ -1548,7 +2276,7 @@ Module['readBinary'] = function(data) {
   var buffer = allocate(data, 'i8', ALLOC_NORMAL);
   var ptr = Module['_BinaryenModuleRead'](buffer, data.length);
   _free(buffer);
-  return new Module['Module'](ptr);
+  return wrapModule(ptr);
 };
 
 // Parses text format to a module
@@ -1557,7 +2285,7 @@ Module['parseText'] = function(text) {
   writeAsciiToMemory(text, buffer);
   var ptr = Module['_BinaryenModuleParse'](buffer);
   _free(buffer);
-  return new Module['Module'](ptr);
+  return wrapModule(ptr);
 };
 
 // Gets the currently set optimize level. 0, 1, 2 correspond to -O0, -O1, -O2, etc.
@@ -1602,4 +2330,3 @@ Module['exit'] = function(status) {
   // a stack trace, for debuggability.
   if (status != 0) throw new Error('exiting due to error: ' + status);
 };
-

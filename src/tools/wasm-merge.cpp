@@ -447,7 +447,7 @@ struct InputMergeable : public ExpressionStackWalker<InputMergeable, Visitor<Inp
 
     // copy in the data
     for (auto& curr : wasm.functionTypes) {
-      outputMergeable.wasm.addFunctionType(curr.release());
+      outputMergeable.wasm.addFunctionType(std::move(curr));
     }
     for (auto& curr : wasm.globals) {
       if (curr->imported()) {
@@ -500,7 +500,7 @@ struct InputMergeable : public ExpressionStackWalker<InputMergeable, Visitor<Inp
   }
 
 private:
-  // add an offset to a get_global. we look above, and if there is already an add,
+  // add an offset to a global.get. we look above, and if there is already an add,
   // we can add into it, avoiding creating a new node
   void addBump(Index bump) {
     if (expressionStack.size() >= 2) {
@@ -580,12 +580,12 @@ int main(int argc, const char* argv[]) {
       .add("--emit-text", "-S", "Emit text instead of binary for the output file",
            Options::Arguments::Zero,
            [&](Options *o, const std::string& argument) { emitBinary = false; })
-      .add("--finalize-memory-base", "-fmb", "Finalize the env.memoryBase import",
+      .add("--finalize-memory-base", "-fmb", "Finalize the env.__memory_base import",
            Options::Arguments::One,
            [&](Options* o, const std::string& argument) {
              finalizeMemoryBase = atoi(argument.c_str());
            })
-      .add("--finalize-table-base", "-ftb", "Finalize the env.tableBase import",
+      .add("--finalize-table-base", "-ftb", "Finalize the env.__table_base import",
            Options::Arguments::One,
            [&](Options* o, const std::string& argument) {
              finalizeTableBase = atoi(argument.c_str());

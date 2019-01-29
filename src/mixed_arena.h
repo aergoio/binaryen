@@ -19,11 +19,13 @@
 
 #include <atomic>
 #include <cassert>
-#include <cstdlib>
 #include <memory>
 #include <mutex>
 #include <thread>
+#include <type_traits>
 #include <vector>
+
+#include <support/alloc.h>
 
 //
 // Arena allocation for mixed-type data.
@@ -58,9 +60,15 @@
 
 struct MixedArena {
   // fast bump allocation
-  std::vector<char*> chunks;
-  size_t chunkSize = 32768;
-  size_t index; // in last chunk
+
+  static const size_t CHUNK_SIZE = 32768;
+  static const size_t MAX_ALIGN = 16; // allow 128bit SIMD
+
+  // Each pointer in chunks is to a multiple of CHUNK_SIZE - typically 1,
+  // but possibly more.
+  std::vector<void*> chunks;
+
+  size_t index = 0; // in last chunk
 
   std::thread::id threadId;
 
@@ -74,7 +82,8 @@ struct MixedArena {
     next.store(nullptr);
   }
 
-  void* allocSpace(size_t size) {
+  // Allocate an amount of space with a guaranteed alignment
+  void* allocSpace(size_t size, size_t align) {
     // the bump allocator data should not be modified by multiple threads at once.
     auto myId = std::this_thread::get_id();
     if (myId != threadId) {
@@ -104,33 +113,36 @@ struct MixedArena {
         curr = seen;
       }
       if (allocated) delete allocated;
-      return curr->allocSpace(size);
+      return curr->allocSpace(size, align);
     }
-    size = (size + 7) & (-8); // same alignment as malloc TODO optimize?
-    bool mustAllocate = false;
-    while (chunkSize <= size) {
-      chunkSize *= 2;
-      mustAllocate = true;
-    }
-    if (chunks.size() == 0 || index + size >= chunkSize || mustAllocate) {
-      chunks.push_back(new char[chunkSize]);
+    // First, move the current index in the last chunk to an aligned position.
+    index = (index + align - 1) & (-align);
+    if (index + size > CHUNK_SIZE || chunks.size() == 0) {
+      // Allocate a new chunk.
+      auto numChunks = (size + CHUNK_SIZE - 1) / CHUNK_SIZE;
+      assert(size <= numChunks * CHUNK_SIZE);
+      auto* allocation = wasm::aligned_malloc(MAX_ALIGN, numChunks * CHUNK_SIZE);
+      if (!allocation) abort();
+      chunks.push_back(allocation);
       index = 0;
     }
-    auto* ret = chunks.back() + index;
-    index += size;
+    uint8_t* ret = static_cast<uint8_t*>(chunks.back());
+    ret += index;
+    index += size; // TODO: if we allocated more than 1 chunk, reuse the remainder, right now we allocate another next time
     return static_cast<void*>(ret);
   }
 
   template<class T>
   T* alloc() {
-    auto* ret = static_cast<T*>(allocSpace(sizeof(T)));
+    static_assert(alignof(T) <= MAX_ALIGN, "maximum alignment not large enough");
+    auto* ret = static_cast<T*>(allocSpace(sizeof(T), alignof(T)));
     new (ret) T(*this); // allocated objects receive the allocator, so they can allocate more later if necessary
     return ret;
   }
 
   void clear() {
-    for (char* chunk : chunks) {
-      delete[] chunk;
+    for (auto* chunk : chunks) {
+      wasm::aligned_free(chunk);
     }
     chunks.clear();
   }
@@ -147,7 +159,7 @@ struct MixedArena {
 //
 // TODO: specialize on the initial size of the array
 
-template <typename SubType, typename T>
+template<typename SubType, typename T>
 class ArenaVectorBase {
 protected:
   T* data = nullptr;
@@ -310,7 +322,7 @@ public:
 //       passed in when needed, would make this (and thus Blocks etc.
 //       smaller)
 
-template <typename T>
+template<typename T>
 class ArenaVector : public ArenaVectorBase<ArenaVector<T>, T> {
 private:
   MixedArena& allocator;
@@ -324,7 +336,7 @@ public:
 
   void allocate(size_t size) {
     this->allocatedElements = size;
-    this->data = static_cast<T*>(allocator.allocSpace(sizeof(T) * this->allocatedElements));
+    this->data = static_cast<T*>(allocator.allocSpace(sizeof(T) * this->allocatedElements, alignof(T)));
   }
 };
 

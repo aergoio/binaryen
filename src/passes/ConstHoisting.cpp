@@ -15,7 +15,7 @@
  */
 
 //
-// Hoists repeated constants to a local. A get_local takes 2 bytes
+// Hoists repeated constants to a local. A local.get takes 2 bytes
 // in most cases, and if a const is larger than that, it may be
 // better to store it to a local, then get it from that local.
 //
@@ -77,7 +77,7 @@ private:
   bool worthHoisting(Literal value, Index num) {
     if (num < MIN_USES) return false;
     // measure the size of the constant
-    Index size;
+    Index size = 0;
     switch (value.type) {
       case i32: {
         size = getWrittenSize(S32LEB(value.geti32()));
@@ -92,7 +92,14 @@ private:
         size = getTypeSize(value.type);
         break;
       }
-      default: WASM_UNREACHABLE();
+      case v128: {
+        // v128 not implemented yet
+        return false;
+      }
+      case none:
+      case unreachable: {
+        WASM_UNREACHABLE();
+      }
     }
     // compute the benefit, of replacing the uses with
     // one use + a set and then a get for each use
@@ -101,7 +108,7 @@ private:
     // or
     //   num > (size+2)/(size-2)
     auto before = num * size;
-    auto after = size + 2 /* set_local */ + (2 /* get_local */ * num);
+    auto after = size + 2 /* local.set */ + (2 /* local.get */ * num);
     return after < before;
   }
 

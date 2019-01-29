@@ -4,7 +4,7 @@
   (type $ii (func (param i32 i32)))
   (type $iii (func (param i32 i32 i32)))
   (type $3 (func))
-  (table 1 1 anyfunc)
+  (table 1 1 funcref)
   (elem (i32.const 0) $call-i)
   (func $call-i (type $i) (param $0 i32)
     (nop)
@@ -184,7 +184,7 @@
         )
       )
     )
-    (set_local $x
+    (local.set $x
       (block $block3 (result i32)
         (drop
           (i32.const 10)
@@ -923,10 +923,10 @@
   (func $mix-select (param $x i32)
     (drop
       (select
-        (get_local $x)
-        (get_local $x)
+        (local.get $x)
+        (local.get $x)
         (block (result i32)
-          (set_local $x ;; cannot be moved before the gets
+          (local.set $x ;; cannot be moved before the gets
             (i32.const 1)
           )
           (i32.const 2)
@@ -939,10 +939,10 @@
     (local $1 f64)
     (if
       (f64.gt
-        (get_local $0)
+        (local.get $0)
         (block $block0 (result f64)
           (nop)
-          (get_local $1)
+          (local.get $1)
         )
       )
       (nop)
@@ -952,11 +952,11 @@
     (local $y i32)
     (if (i32.const 1)
       (block
-        (set_local $x
+        (local.set $x
           (i32.le_u
-            (get_local $x)
+            (local.get $x)
             (block (result i32)
-              (set_local $y (i32.const 5))
+              (local.set $y (i32.const 5))
               (i32.const 10)
             )
           )
@@ -968,11 +968,11 @@
     (local $y i32)
     (if (i32.const 1)
       (block
-        (set_local $x
+        (local.set $x
           (i32.le_u
-            (get_local $y)
+            (local.get $y)
             (block (result i32)
-              (set_local $y (i32.const 5))
+              (local.set $y (i32.const 5))
               (i32.const 10)
             )
           )
@@ -1322,4 +1322,237 @@
   )
  )
 )
-
+(module
+ (func $unreachable-in-sub-block (param $0 f64) (param $1 i32) (result i32)
+  (local $2 i32)
+  (local $9 i32)
+  (loop $label$1
+   (local.set $9
+    (local.tee $2
+     (block $label$2 (result i32)
+      (block
+       (drop
+        (br_if $label$2
+         (local.tee $2
+          (i32.const 0)
+         )
+         (i32.const 0)
+        )
+       )
+      )
+      (br_if $label$1
+       (i32.const 0)
+      )
+      (block
+       (unreachable)
+       (nop) ;; bad if moved out to the outer block which is i32. current state works since this block is unreachable!
+      )
+     )
+    )
+   )
+  )
+  (nop)
+  (local.get $9)
+ )
+ (func $trivial (result i32)
+   (block (result i32)
+     (block
+       (unreachable)
+       (nop)
+     )
+   )
+ )
+ (func $trivial-more (result i32)
+   (block (result i32)
+     (block
+       (nop)
+       (unreachable)
+       (nop)
+       (nop)
+       (nop)
+     )
+     (block
+       (nop)
+       (unreachable)
+       (nop)
+     )
+   )
+ )
+)
+(module
+ (func $merge-some-block
+  (block $b1
+   (drop (i32.const 1))
+   (br_if $b1 (i32.const 0))
+  )
+  (block $b2
+   (br_if $b2 (i32.const 0))
+   (drop (i32.const 2))
+  )
+  (block $b3
+   (drop (i32.const 3))
+   (br_if $b3 (i32.const 0))
+   (drop (i32.const 4))
+  )
+  (block $b3-dead-code-so-ignore
+   (drop (i32.const 3))
+   (br $b3-dead-code-so-ignore)
+   (drop (i32.const 4))
+  )
+  (block $b4
+   (drop (i32.const 5))
+   (br_if $b4 (i32.const 0))
+   (drop (i32.const 6))
+   (br_if $b4 (i32.const 0))
+  )
+  (block $b5
+   (br_if $b5 (i32.const 0))
+   (drop (i32.const 7))
+   (br_if $b5 (i32.const 0))
+   (drop (i32.const 8))
+  )
+  (block $b6
+   (drop (i32.const 9))
+   (drop (i32.const 10))
+   (br_if $b6 (i32.const 0))
+  )
+ )
+ (func $merge-some-loop
+  (loop $l1
+   (block $b1
+    (drop (i32.const 1))
+    (br_if $b1 (i32.const 0))
+   )
+  )
+  (loop $l2
+   (block $b2
+    (br_if $b2 (i32.const 0))
+    (drop (i32.const 2))
+   )
+  )
+  (loop $l3
+   (block $b3
+    (drop (i32.const 3))
+    (br_if $b3 (i32.const 0))
+    (drop (i32.const 4))
+   )
+  )
+  (loop $l4
+   (block $b4
+    (drop (i32.const 5))
+    (br_if $b4 (i32.const 0))
+    (drop (i32.const 6))
+    (br_if $b4 (i32.const 0))
+   )
+  )
+  (loop $l5
+   (block $b5
+    (br_if $b5 (i32.const 0))
+    (drop (i32.const 7))
+    (br_if $b5 (i32.const 0))
+    (drop (i32.const 8))
+   )
+  )
+  (loop $l6
+   (block $b6
+    (drop (i32.const 9))
+    (drop (i32.const 10))
+    (br_if $b6 (i32.const 0))
+   )
+  )
+ )
+ (func $merge-some-loop-taken
+  (loop $l1
+   (block $b1
+    (drop (i32.const 1))
+    (br_if $l1 (i32.const 0))
+    (drop (i32.const 2))
+    (br_if $b1 (i32.const 0))
+    (drop (i32.const 3))
+   )
+  )
+  (loop $l2
+   (block $b2
+    (drop (i32.const 4))
+    (br_if $b2 (i32.const 0))
+    (drop (i32.const 5))
+    (br_if $l2 (i32.const 0))
+    (drop (i32.const 6))
+   )
+  )
+  (loop $l3
+   (block $b3
+    (drop (i32.const 7))
+    (br_if $b3 (i32.const 0))
+    (drop (i32.const 8))
+    (br_if $l3 (i32.const 0))
+   )
+  )
+  (loop $l4
+   (block $b4
+    (br_if $l4 (i32.const 0))
+    (drop (i32.const 9))
+    (br_if $b4 (i32.const 0))
+    (drop (i32.const 10))
+   )
+  )
+  (loop $l5
+   (block $b5
+    (drop (i32.const 7))
+    (br_if $b5 (i32.const 0))
+    (br_if $l5 (i32.const 0))
+   )
+  )
+  (loop $l6
+   (block $b6
+    (br_if $l6 (i32.const 0))
+    (br_if $b6 (i32.const 0))
+    (drop (i32.const 10))
+   )
+  )
+  (loop $l7
+   (block $b7
+    (drop (i32.const 11))
+    (br_if $l7 (i32.const 0))
+    (br_if $b7 (i32.const 0))
+    (drop (i32.const 13))
+   )
+  )
+  (loop $l8
+   (block $b8
+    (drop (i32.const 14))
+    (br_if $b8 (i32.const 0))
+    (br_if $l8 (i32.const 0))
+    (drop (i32.const 16))
+   )
+  )
+  (loop $l9
+   (block $b9
+    (drop (i32.const 17))
+    (br_if $l9 (i32.const 0))
+    (drop (i32.const 18))
+    (br_if $l9 (i32.const 0))
+    (drop (i32.const 19))
+   )
+  )
+  (loop $l10
+   (block $b10
+    (drop (i32.const 20))
+    (br_if $l10 (i32.const 0))
+    (drop (i32.const 21))
+   )
+  )
+  (loop $l11
+   (block $b11
+    (br_if $l11 (i32.const 0))
+    (drop (i32.const 23))
+   )
+  )
+  (loop $l12
+   (block $b12
+    (drop (i32.const 24))
+    (br_if $l12 (i32.const 0))
+   )
+  )
+ )
+)

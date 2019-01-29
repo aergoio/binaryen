@@ -18,6 +18,7 @@
 #define wasm_ir_module_h
 
 #include "wasm.h"
+#include "ir/find_all.h"
 #include "ir/manipulation.h"
 
 namespace wasm {
@@ -91,6 +92,8 @@ inline Global* copyGlobal(Global* global, Module& out) {
   ret->name = global->name;
   ret->type = global->type;
   ret->mutable_ = global->mutable_;
+  ret->module = global->module;
+  ret->base = global->base;
   if (global->imported()) {
     ret->init = nullptr;
   } else {
@@ -104,7 +107,7 @@ inline void copyModule(Module& in, Module& out) {
   // we use names throughout, not raw points, so simple copying is fine
   // for everything *but* expressions
   for (auto& curr : in.functionTypes) {
-    out.addFunctionType(new FunctionType(*curr));
+    out.addFunctionType(make_unique<FunctionType>(*curr));
   }
   for (auto& curr : in.exports) {
     out.addExport(new Export(*curr));
@@ -128,7 +131,87 @@ inline void copyModule(Module& in, Module& out) {
   out.debugInfoFileNames = in.debugInfoFileNames;
 }
 
-// Convenient iteration over imported/non-imported functions/globals
+// Renaming
+
+// Rename functions along with all their uses.
+// Note that for this to work the functions themselves don't necessarily need
+// to exist.  For example, it is possible to remove a given function and then
+// call this redirect all of its uses.
+template<typename T>
+inline void renameFunctions(Module& wasm, T& map) {
+  // Update the function itself.
+  for (auto& pair : map) {
+    if (Function* F = wasm.getFunctionOrNull(pair.first)) {
+      assert(!wasm.getFunctionOrNull(pair.second));
+      F->name = pair.second;
+    }
+  }
+  wasm.updateMaps();
+  // Update other global things.
+  auto maybeUpdate = [&](Name& name) {
+    auto iter = map.find(name);
+    if (iter != map.end()) {
+      name = iter->second;
+    }
+  };
+  maybeUpdate(wasm.start);
+  for (auto& segment : wasm.table.segments) {
+    for (auto& name : segment.data) {
+      maybeUpdate(name);
+    }
+  }
+  for (auto& exp : wasm.exports) {
+    if (exp->kind == ExternalKind::Function) {
+      maybeUpdate(exp->value);
+    }
+  }
+  // Update call instructions.
+  for (auto& func : wasm.functions) {
+    // TODO: parallelize
+    if (!func->imported()) {
+      FindAll<Call> calls(func->body);
+      for (auto* call : calls.list) {
+        maybeUpdate(call->target);
+      }
+    }
+  }
+}
+
+inline void renameFunction(Module& wasm, Name oldName, Name newName) {
+  std::map<Name, Name> map;
+  map[oldName] = newName;
+  renameFunctions(wasm, map);
+}
+
+// Convenient iteration over imported/non-imported module elements
+
+template<typename T>
+inline void iterImportedMemories(Module& wasm, T visitor) {
+  if (wasm.memory.exists && wasm.memory.imported()) {
+    visitor(&wasm.memory);
+  }
+}
+
+template<typename T>
+inline void iterDefinedMemories(Module& wasm, T visitor) {
+  if (wasm.memory.exists && !wasm.memory.imported()) {
+    visitor(&wasm.memory);
+  }
+}
+
+template<typename T>
+inline void iterImportedTables(Module& wasm, T visitor) {
+  if (wasm.table.exists && wasm.table.imported()) {
+    visitor(&wasm.table);
+  }
+}
+
+template<typename T>
+inline void iterDefinedTables(Module& wasm, T visitor) {
+  if (wasm.table.exists && !wasm.table.imported()) {
+    visitor(&wasm.table);
+  }
+}
 
 template<typename T>
 inline void iterImportedGlobals(Module& wasm, T visitor) {

@@ -28,7 +28,9 @@ SET(passes_SOURCES
   MergeBlocks.cpp
   MergeLocals.cpp
   Metrics.cpp
+  MinifyImportsAndExports.cpp
   NameList.cpp
+  NoExitRuntime.cpp
   OptimizeInstructions.cpp
   PickLoadSigns.cpp
   PostEmscripten.cpp
@@ -36,6 +38,7 @@ SET(passes_SOURCES
   Print.cpp
   PrintCallGraph.cpp
   StackIR.cpp
+  Strip.cpp
   RedundantSetElimination.cpp
   RelooperJumpThreading.cpp
   ReReloop.cpp

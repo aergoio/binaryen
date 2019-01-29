@@ -24,5 +24,44 @@
     )
    )
   )
+  (func $many-selects (export "many-selects") (param $0 i32) (result i32)
+   (if
+    (i32.lt_s
+     (local.get $0)
+     (i32.const -1073741824)
+    )
+    (local.set $0
+     (i32.const -1073741824)
+    )
+    (if
+     (i32.gt_s
+      (local.get $0)
+      (i32.const 1073741823)
+     )
+     (local.set $0
+      (i32.const 1073741823)
+     )
+    )
+   )
+   (local.get $0)
+  )
+  (func $end-if-else (export "end-if-else") (param $x i32) (result i32)
+    (if
+      (local.get $x)
+      (local.set $x
+        (i32.const 1)
+      )
+    )
+    (local.get $x)
+  )
+  (func $end-if-else-call (export "end-if-else-call") (param $x i32) (result i32)
+    (if
+      (local.get $x)
+      (local.set $x
+        (call $ret)
+      )
+    )
+    (local.get $x)
+  )
 )
 

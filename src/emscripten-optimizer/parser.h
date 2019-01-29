@@ -59,8 +59,6 @@ extern IString TOPLEVEL,
                TRY,
                INF,
                NaN,
-               TEMP_RET0,
-               GET_TEMP_RET0,
                LLVM_CTTZ_I32,
                UDIVMODDI4,
                UNARY_PREFIX,
@@ -93,7 +91,6 @@ extern IString TOPLEVEL,
                RSHIFT,
                LSHIFT,
                TRSHIFT,
-               TEMP_DOUBLE_PTR,
                HEAP8,
                HEAP16,
                HEAP32,
@@ -913,8 +910,8 @@ class Parser {
 
   // Debugging
 
-  char *allSource;
-  int allSize;
+  char *allSource = nullptr;
+  int allSize = 0;
 
   static void dump(const char *where, char* curr) {
     /*
@@ -941,7 +938,7 @@ class Parser {
 
 public:
 
-  Parser() : allSource(nullptr), allSize(0) {
+  Parser() {
     expressionPartsStack.resize(1);
   }
 

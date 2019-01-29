@@ -71,7 +71,10 @@ There are a few differences between Binaryen IR and the WebAssembly language:
    * WebAssembly limits block/if/loop types to none and the concrete value types
      (i32, i64, f32, f64). Binaryen IR has an unreachable type, and it allows
      block/if/loop to take it, allowing [local transforms that don't need to
-     know the global context][unreachable].
+     know the global context][unreachable]. As a result, Binaryen's default
+     text output is not necessarily valid wasm text. (To get valid wasm text,
+     you can do `--generate-stack-ir --print-stack-ir`, which prints Stack IR,
+     this is guaranteed to be valid for wasm parsers.)
    * Binaryen ignores unreachable code when reading WebAssembly binaries. That
      means that if you read a wasm file with unreachable code, that code will be
      discarded as if it were optimized out (often this is what you want anyhow,
@@ -145,11 +148,6 @@ This repository contains code that builds the following tools in `bin/`:
    time. Used by Emscripten.
  * **wasm-emscripten-finalize**: Takes a wasm binary produced by llvm+lld and
    performs emscripten-specific passes over it.
- * **wasm.js**: wasm.js contains Binaryen components compiled to JavaScript,
-   including the interpreter, `asm2wasm`, the S-Expression parser, etc., which
-   allow you to use Binaryen with Emscripten and execute code compiled to WASM
-   even if the browser doesn't have native support yet. This can be useful as a
-   (slow) polyfill.
  * **binaryen.js**: A standalone JavaScript library that exposes Binaryen methods for [creating and optimizing WASM modules](https://github.com/WebAssembly/binaryen/blob/master/test/binaryen.js/hello-world.js). For builds, see [binaryen.js on npm](https://www.npmjs.com/package/binaryen) (or download it directly from [github](https://raw.githubusercontent.com/AssemblyScript/binaryen.js/master/index.js), [rawgit](https://cdn.rawgit.com/AssemblyScript/binaryen.js/master/index.js), or [unpkg](https://unpkg.com/binaryen@latest/index.js)).
 
 Usage instructions for each are below.
@@ -287,7 +285,7 @@ about how to use it.
 ./check.py
 ```
 
-(or `python check.py`) will run `wasm-shell`, `wasm-opt`, `asm2wasm`, `wasm.js`, etc. on the testcases in `test/`, and verify their outputs.
+(or `python check.py`) will run `wasm-shell`, `wasm-opt`, `asm2wasm`, etc. on the testcases in `test/`, and verify their outputs.
 
 The `check.py` script supports some options:
 
@@ -351,9 +349,8 @@ variables onto locations in memory, but then it must know of a safe zone in
 memory in which to do so, and that information is not directly available in
 asm.js.
 
-`asm2wasm` and `emcc_to_wasm.js.sh` do some integration with Emscripten in order
-to work around these issues, like asking Emscripten to reserve same space for
-the globals, etc.
+`asm2wasm` do some integration with Emscripten in order to work around these
+issues, like asking Emscripten to reserve same space for the globals, etc.
 
 * Why the weird name for the project?
 

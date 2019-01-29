@@ -19,6 +19,7 @@
 #include "ir/load-utils.h"
 
 namespace wasm {
+
 // Given a stack of expressions, checks if the topmost is used as a result.
 // For example, if the parent is a block and the node is before the last position,
 // it is not used.
@@ -248,6 +249,37 @@ bool ExpressionAnalyzer::flexibleEqual(Expression* left, Expression* right, Expr
         PUSH(AtomicWake, wakeCount);
         break;
       }
+      case Expression::Id::SIMDExtractId: {
+        CHECK(SIMDExtract, op);
+        CHECK(SIMDExtract, index);
+        PUSH(SIMDExtract, vec);
+        break;
+      }
+      case Expression::Id::SIMDReplaceId: {
+        CHECK(SIMDReplace, op);
+        CHECK(SIMDReplace, index);
+        PUSH(SIMDReplace, vec);
+        PUSH(SIMDReplace, value);
+        break;
+      }
+      case Expression::Id::SIMDShuffleId: {
+        CHECK(SIMDShuffle, mask);
+        PUSH(SIMDShuffle, left);
+        PUSH(SIMDShuffle, right);
+        break;
+      }
+      case Expression::Id::SIMDBitselectId: {
+        PUSH(SIMDBitselect, left);
+        PUSH(SIMDBitselect, right);
+        PUSH(SIMDBitselect, cond);
+        break;
+      }
+      case Expression::Id::SIMDShiftId: {
+        CHECK(SIMDShift, op);
+        PUSH(SIMDShift, vec);
+        PUSH(SIMDShift, shift);
+        break;
+      }
       case Expression::Id::ConstId: {
         if (left->cast<Const>()->value != right->cast<Const>()->value) {
           return false;
@@ -294,7 +326,10 @@ bool ExpressionAnalyzer::flexibleEqual(Expression* left, Expression* right, Expr
       case Expression::Id::UnreachableId: {
         break;
       }
-      default: WASM_UNREACHABLE();
+      case Expression::Id::InvalidId:
+      case Expression::Id::NumExpressionIds: {
+        WASM_UNREACHABLE();
+      }
     }
     #undef CHECK
     #undef PUSH
@@ -305,14 +340,14 @@ bool ExpressionAnalyzer::flexibleEqual(Expression* left, Expression* right, Expr
 
 
 // hash an expression, ignoring superficial details like specific internal names
-uint32_t ExpressionAnalyzer::hash(Expression* curr) {
-  uint32_t digest = 0;
+HashType ExpressionAnalyzer::hash(Expression* curr) {
+  HashType digest = 0;
 
-  auto hash = [&digest](uint32_t hash) {
+  auto hash = [&digest](HashType hash) {
     digest = rehash(digest, hash);
   };
   auto hash64 = [&digest](uint64_t hash) {
-    digest = rehash(rehash(digest, uint32_t(hash >> 32)), uint32_t(hash));
+    digest = rehash(rehash(digest, HashType(hash >> 32)), HashType(hash));
   };
 
   std::vector<Name> nameStack;
@@ -353,7 +388,7 @@ uint32_t ExpressionAnalyzer::hash(Expression* curr) {
     hash(curr->_id);
     // we often don't need to hash the type, as it is tied to other values
     // we are hashing anyhow, but there are exceptions: for example, a
-    // get_local's type is determined by the function, so if we are
+    // local.get's type is determined by the function, so if we are
     // hashing only expression fragments, then two from different
     // functions may turn out the same even if the type differs. Likewise,
     // if we hash between modules, then we need to take int account
@@ -493,15 +528,43 @@ uint32_t ExpressionAnalyzer::hash(Expression* curr) {
         PUSH(AtomicWake, wakeCount);
         break;
       }
+      case Expression::Id::SIMDExtractId: {
+        HASH(SIMDExtract, op);
+        HASH(SIMDExtract, index);
+        PUSH(SIMDExtract, vec);
+        break;
+      }
+      case Expression::Id::SIMDReplaceId: {
+        HASH(SIMDReplace, op);
+        HASH(SIMDReplace, index);
+        PUSH(SIMDReplace, vec);
+        PUSH(SIMDReplace, value);
+        break;
+      }
+      case Expression::Id::SIMDShuffleId: {
+        for (size_t i = 0; i < 16; ++i) {
+          HASH(SIMDShuffle, mask[i]);
+        }
+        PUSH(SIMDShuffle, left);
+        PUSH(SIMDShuffle, right);
+        break;
+      }
+      case Expression::Id::SIMDBitselectId: {
+        PUSH(SIMDBitselect, left);
+        PUSH(SIMDBitselect, right);
+        PUSH(SIMDBitselect, cond);
+        break;
+      }
+      case Expression::Id::SIMDShiftId: {
+        HASH(SIMDShift, op);
+        PUSH(SIMDShift, vec);
+        PUSH(SIMDShift, shift);
+        break;
+      }
       case Expression::Id::ConstId: {
         auto* c = curr->cast<Const>();
         hash(c->type);
-        auto bits = c->value.getBits();
-        if (getTypeSize(c->type) == 4) {
-          hash(uint32_t(bits));
-        } else {
-          hash64(bits);
-        }
+        hash(std::hash<Literal>()(c->value));
         break;
       }
       case Expression::Id::UnaryId: {
@@ -544,11 +607,15 @@ uint32_t ExpressionAnalyzer::hash(Expression* curr) {
       case Expression::Id::UnreachableId: {
         break;
       }
-      default: WASM_UNREACHABLE();
+      case Expression::Id::InvalidId:
+      case Expression::Id::NumExpressionIds: {
+        WASM_UNREACHABLE();
+      }
     }
     #undef HASH
     #undef PUSH
   }
   return digest;
 }
+
 } // namespace wasm

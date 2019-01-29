@@ -40,7 +40,7 @@ namespace DataFlow {
 // contains the DataFlow IR for that expression, which can be a
 // Bad node if not supported, or nullptr if not relevant (we only
 // use the return value for internal expressions, that is, the
-// value of a set_local or the condition of an if etc).
+// value of a local.set or the condition of an if etc).
 struct Graph : public UnifiedExpressionVisitor<Graph, Node*> {
   // We only need one canonical bad node. It is never modified.
   Node bad = Node(Node::Type::Bad);
@@ -153,7 +153,7 @@ struct Graph : public UnifiedExpressionVisitor<Graph, Node*> {
   }
 
   Node* makeZero(wasm::Type type) {
-    return makeConst(LiteralUtils::makeLiteralZero(type));
+    return makeConst(Literal::makeZero(type));
   }
 
   // Add a new node to our list of owned nodes.
@@ -518,14 +518,14 @@ struct Graph : public UnifiedExpressionVisitor<Graph, Node*> {
         Builder builder(*module);
         BinaryOp opposite;
         switch (curr->op) {
-          case GtSInt32: opposite = LeSInt32; break;
-          case GtSInt64: opposite = LeSInt64; break;
-          case GeSInt32: opposite = LtSInt32; break;
-          case GeSInt64: opposite = LtSInt64; break;
-          case GtUInt32: opposite = LeUInt32; break;
-          case GtUInt64: opposite = LeUInt64; break;
-          case GeUInt32: opposite = LtUInt32; break;
-          case GeUInt64: opposite = LtUInt64; break;
+          case GtSInt32: opposite = LtSInt32; break;
+          case GtSInt64: opposite = LtSInt64; break;
+          case GeSInt32: opposite = LeSInt32; break;
+          case GeSInt64: opposite = LeSInt64; break;
+          case GtUInt32: opposite = LtUInt32; break;
+          case GtUInt64: opposite = LtUInt64; break;
+          case GeUInt32: opposite = LeUInt32; break;
+          case GeUInt64: opposite = LeUInt64; break;
           default: WASM_UNREACHABLE();
         }
         auto* ret = visitBinary(builder.makeBinary(opposite, curr->right, curr->left));
@@ -699,7 +699,7 @@ struct Graph : public UnifiedExpressionVisitor<Graph, Node*> {
     return node;
   }
 
-  // Given a node representing something that is set_local'd, return
+  // Given a node representing something that is local.set'd, return
   // the set.
   SetLocal* getSet(Node* node) {
     auto iter = nodeParentMap.find(node);
@@ -721,7 +721,7 @@ struct Graph : public UnifiedExpressionVisitor<Graph, Node*> {
   }
 
   // Creates an expression that uses a node. Generally, a node represents
-  // a value in a local, so we create a get_local for it.
+  // a value in a local, so we create a local.get for it.
   Expression* makeUse(Node* node) {
     Builder builder(*module);
     if (node->isPhi()) {
@@ -739,13 +739,15 @@ struct Graph : public UnifiedExpressionVisitor<Graph, Node*> {
       // i1 zexts are a no-op for wasm
       return makeUse(node->values[0]);
     } else if (node->isVar()) {
-      // Nothing valid for us to read here.
-      // FIXME should we have a local index to get?
-      return Builder(*module).makeConst(LiteralUtils::makeLiteralZero(node->wasmType));
+      // Nothing valid for us to read here. Emit a call, representing an unknown
+      // variable value.
+      return Builder(*module).makeCall(FAKE_CALL, {}, node->wasmType);
     } else {
       WASM_UNREACHABLE(); // TODO
     }
   }
+
+  const Name FAKE_CALL = "fake$dfo$call";
 };
 
 } // namespace DataFlow

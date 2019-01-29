@@ -25,12 +25,12 @@
 #include "execution-results.h"
 #include "pass.h"
 #include "shell-interface.h"
-#include "support/command-line.h"
 #include "support/file.h"
 #include "wasm-interpreter.h"
 #include "wasm-printing.h"
 #include "wasm-s-parser.h"
 #include "wasm-validator.h"
+#include "tool-options.h"
 
 using namespace cashew;
 using namespace wasm;
@@ -233,14 +233,14 @@ int main(int argc, const char* argv[]) {
   Name entry;
   std::set<size_t> skipped;
 
-  Options options("wasm-shell", "Execute .wast files");
+  ToolOptions options("wasm-shell", "Execute .wast files");
   options
       .add(
-          "--entry", "-e", "call the entry point after parsing the module",
+          "--entry", "-e", "Call the entry point after parsing the module",
           Options::Arguments::One,
           [&entry](Options*, const std::string& argument) { entry = argument; })
       .add(
-          "--skip", "-s", "skip input on certain lines (comma-separated-list)",
+          "--skip", "-s", "Skip input on certain lines (comma-separated-list)",
           Options::Arguments::One,
           [&skipped](Options*, const std::string& argument) {
             size_t i = 0;
@@ -292,7 +292,7 @@ int main(int argc, const char* argv[]) {
         builders[moduleName].swap(builder);
         modules[moduleName].swap(module);
         i++;
-        bool valid = WasmValidator().validate(*modules[moduleName]);
+        bool valid = WasmValidator().validate(*modules[moduleName], options.getFeatures());
         if (!valid) {
           WasmPrinter::printModule(modules[moduleName].get());
         }

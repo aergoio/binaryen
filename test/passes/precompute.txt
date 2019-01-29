@@ -3,6 +3,7 @@
  (type $1 (func (result i32)))
  (type $2 (func))
  (type $3 (func (result f64)))
+ (type $4 (func (result v128)))
  (memory $0 0)
  (global $global i32 (i32.const 1))
  (global $global-mut (mut i32) (i32.const 2))
@@ -14,7 +15,7 @@
   (drop
    (i32.add
     (i32.const 1)
-    (get_local $x)
+    (local.get $x)
    )
   )
   (nop)
@@ -141,7 +142,7 @@
      (block $label$2
       (drop
        (i64.and
-        (i64.trunc_u/f32
+        (i64.trunc_f32_u
          (f32.const 70847791997969805621592064)
         )
         (i64.const 729618461987467893)
@@ -162,11 +163,11 @@
  (func $refinalize-two-breaks-one-unreachable (; 6 ;) (type $2)
   (drop
    (block $label$0 (result i64)
-    (br_if $label$0
+    (block
      (select
       (i64.const 1)
       (block $block
-       (set_global $global-mut
+       (global.set $global-mut
         (i32.const 1)
        )
        (br $label$0
@@ -175,24 +176,28 @@
       )
       (i32.const 0)
      )
-     (i32.const 1)
+     (drop
+      (i32.const 1)
+     )
     )
    )
   )
  )
  (func $one-break-value-and-it-is-unreachable (; 7 ;) (type $3) (result f64)
   (local $var$0 i32)
-  (block $label$6 (result f64)
-   (br_if $label$6
+  (block $label$6
+   (block
     (unreachable)
-    (i32.const 0)
+    (drop
+     (i32.const 0)
+    )
    )
   )
  )
  (func $global-notprecomputable (; 8 ;) (type $1) (result i32)
   (i32.add
    (i32.const 1)
-   (get_global $global-mut)
+   (global.get $global-mut)
   )
  )
  (func $global-precomputable (; 9 ;) (type $1) (result i32)
@@ -202,9 +207,14 @@
   (i32.sub
    (i32.add
     (i32.const 1)
-    (get_global $global-mut)
+    (global.get $global-mut)
    )
    (i32.const 2)
+  )
+ )
+ (func $no-simd-precompute (; 11 ;) (type $4) (result v128)
+  (i32x4.splat
+   (i32.const 0)
   )
  )
 )

@@ -5,7 +5,7 @@
   (data (i32.const 10) "waka ")
   (data (i32.const 15) "waka") ;; skip a byte here
   (data (i32.const 20) "waka waka waka")
-  (table 1 1 anyfunc)
+  (table 1 1 funcref)
   (elem (i32.const 0) $call-indirect)
   (export "test1" $test1)
   (export "test2" $test2)
@@ -17,8 +17,10 @@
   )
   (func $test2
     (drop (i32.load (i32.const 12))) ;; a safe load
-    (drop (i32.load16 (i32.const 12)))
-    (drop (i32.load8 (i32.const 12)))
+    (drop (i32.load16_s (i32.const 12)))
+    (drop (i32.load8_s (i32.const 12)))
+    (drop (i32.load16_u (i32.const 12)))
+    (drop (i32.load8_u (i32.const 12)))
   )
   (func $test3
     (i32.store (i32.const 12) (i32.const 115)) ;; a safe store, should alter memory

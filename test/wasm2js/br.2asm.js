@@ -510,7 +510,7 @@ function asmFunc(global, env, buffer) {
  }
  
  function $54() {
-  var $0 = 0, $1_1 = 0;
+  var $0 = 0;
   block : {
    block0 : {
     $0 = 8;
@@ -523,10 +523,8 @@ function asmFunc(global, env, buffer) {
  function $55() {
   var $0 = 0, $1_1 = 0;
   block : {
-   block1 : {
-    $0 = 8;
-    break block;
-   };
+   $0 = 8;
+   break block;
   };
   return 1 + $0 | 0 | 0;
  }
@@ -541,12 +539,10 @@ function asmFunc(global, env, buffer) {
  }
  
  function $57() {
-  var $0 = 0, $1_1 = 0;
+  var $0 = 0;
   block : {
-   block2 : {
-    $0 = 8;
-    break block;
-   };
+   $0 = 8;
+   break block;
   };
   return 1 + $0 | 0 | 0;
  }
@@ -652,7 +648,7 @@ function asmFunc(global, env, buffer) {
   as_call_indirect_first: $35, 
   as_call_indirect_mid: $36, 
   as_call_indirect_last: $37, 
-  as_set_local_value: $38, 
+  as_local_set_value: $38, 
   as_load_address: $39, 
   as_loadN_address: $40, 
   as_store_address: $41, 
@@ -714,7 +710,7 @@ export const as_call_indirect_func = retasmFunc.as_call_indirect_func;
 export const as_call_indirect_first = retasmFunc.as_call_indirect_first;
 export const as_call_indirect_mid = retasmFunc.as_call_indirect_mid;
 export const as_call_indirect_last = retasmFunc.as_call_indirect_last;
-export const as_set_local_value = retasmFunc.as_set_local_value;
+export const as_local_set_value = retasmFunc.as_local_set_value;
 export const as_load_address = retasmFunc.as_load_address;
 export const as_loadN_address = retasmFunc.as_loadN_address;
 export const as_store_address = retasmFunc.as_store_address;

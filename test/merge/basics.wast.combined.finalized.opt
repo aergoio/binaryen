@@ -2,9 +2,13 @@
  (type $ii (func (param i32 i32)))
  (type $FUNCSIG$v (func))
  (import "env" "memory" (memory $0 256))
- (data (i32.const 1024) "hello, A!\n\00\00\00\00\00\00hello, B!\n")
- (import "env" "table" (table 18 anyfunc))
- (elem (i32.const 8) $only-a $willCollide $some-func $some-collide $only-a $some-func $only-b $willCollide$0 $some-func-b $some-collide$0)
+ (data (global.get $memoryBase) "hello, A!\n\00\00\00\00\00\00hello, B!\n")
+ (import "env" "table" (table $0 18 funcref))
+ (elem (global.get $tableBase) $only-a $willCollide $some-func $some-collide $only-a $some-func $only-b $willCollide$0 $some-func-b $some-collide$0)
+ (import "env" "memoryBase" (global $memoryBase i32))
+ (import "env" "tableBase" (global $tableBase i32))
+ (import "env" "memoryBase" (global $memoryBase$0 i32))
+ (import "env" "tableBase" (global $tableBase$0 i32))
  (import "env" "some-func" (func $some-func))
  (import "env" "some-collide" (func $some-collide))
  (import "env" "some-func-b" (func $some-func-b))
@@ -31,11 +35,15 @@
   (nop)
   (nop)
   (drop
-   (get_global $global-a-mut)
+   (global.get $global-a-mut)
   )
-  (nop)
-  (nop)
-  (set_global $global-collide-mut
+  (drop
+   (global.get $memoryBase)
+  )
+  (drop
+   (global.get $tableBase)
+  )
+  (global.set $global-collide-mut
    (i32.const 1234)
   )
  )
@@ -56,20 +64,39 @@
   (nop)
   (nop)
   (drop
-   (get_global $global-b-mut)
+   (global.get $global-b-mut)
   )
-  (nop)
-  (nop)
-  (nop)
-  (nop)
+  (drop
+   (global.get $memoryBase$0)
+  )
+  (drop
+   (global.get $tableBase$0)
+  )
   (drop
    (i32.add
-    (i32.const 14)
+    (global.get $memoryBase$0)
+    (i32.const 1000)
+   )
+  )
+  (drop
+   (i32.add
+    (global.get $tableBase$0)
+    (i32.const 1000)
+   )
+  )
+  (drop
+   (i32.add
+    (global.get $tableBase$0)
     (unreachable)
    )
   )
-  (nop)
-  (set_global $global-collide-mut$0
+  (drop
+   (i32.sub
+    (global.get $tableBase$0)
+    (i32.const 1000)
+   )
+  )
+  (global.set $global-collide-mut$0
    (i32.const 5678)
   )
  )

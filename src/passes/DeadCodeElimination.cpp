@@ -257,8 +257,13 @@ struct DeadCodeElimination : public WalkerPass<PostWalker<DeadCodeElimination>> 
         case Expression::Id::AtomicRMWId: DELEGATE(AtomicRMW);
         case Expression::Id::AtomicWaitId: DELEGATE(AtomicWait);
         case Expression::Id::AtomicWakeId: DELEGATE(AtomicWake);
-        case Expression::Id::InvalidId:
-        default: WASM_UNREACHABLE();
+        case Expression::Id::SIMDExtractId: DELEGATE(SIMDExtract);
+        case Expression::Id::SIMDReplaceId: DELEGATE(SIMDReplace);
+        case Expression::Id::SIMDShuffleId: DELEGATE(SIMDShuffle);
+        case Expression::Id::SIMDBitselectId: DELEGATE(SIMDBitselect);
+        case Expression::Id::SIMDShiftId: DELEGATE(SIMDShift);
+        case Expression::Id::InvalidId: WASM_UNREACHABLE();
+        case Expression::Id::NumExpressionIds: WASM_UNREACHABLE();
       }
       #undef DELEGATE
       return;

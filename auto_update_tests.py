@@ -34,7 +34,7 @@ def update_asm_js_tests():
     if asm.endswith('.asm.js'):
       for precise in [0, 1, 2]:
         for opts in [1, 0]:
-          cmd = ASM2WASM + [os.path.join('test', asm), '--enable-threads']
+          cmd = ASM2WASM + [os.path.join('test', asm)]
           wasm = asm.replace('.asm.js', '.fromasm')
           if not precise:
             cmd += ['--trap-mode=allow', '--ignore-implicit-traps']
@@ -74,18 +74,20 @@ def update_asm_js_tests():
 def update_lld_tests():
   print '\n[ checking wasm-emscripten-finalize testcases... ]\n'
 
-  extension_arg_map = {
-    '.out': [],
-    '.jscall.out': ['--emscripten-reserved-function-pointers=3'],
-  }
   for wast_path in files_with_pattern('test', 'lld', '*.wast'):
     print '..', wast_path
+    mem_file = wast_path + '.mem'
+    extension_arg_map = {
+      '.out': [],
+      '.jscall.out': ['--emscripten-reserved-function-pointers=3'],
+      '.mem.out': ['--separate-data-segments', mem_file],
+    }
     for ext, ext_args in extension_arg_map.items():
       out_path = wast_path + ext
       if ext != '.out' and not os.path.exists(out_path):
         continue
       cmd = (WASM_EMSCRIPTEN_FINALIZE +
-             [wast_path, '-S', '--global-base=568'] + ext_args)
+             [wast_path, '-S', '--global-base=568', '--initial-stack-pointer=16384'] + ext_args)
       actual = run_command(cmd)
       with open(out_path, 'w') as o:
         o.write(actual)

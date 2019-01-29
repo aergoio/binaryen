@@ -29,14 +29,16 @@ namespace BinaryConsts {
 namespace UserSections {
 const char* Name = "name";
 const char* SourceMapUrl = "sourceMappingURL";
-
 const char* Dylink = "dylink";
+const char* Linking = "linking";
 }
 }
 
 Name GROW_WASM_MEMORY("__growWasmMemory"),
-     MEMORY_BASE("memoryBase"),
-     TABLE_BASE("tableBase"),
+     MEMORY_BASE("__memory_base"),
+     TABLE_BASE("__table_base"),
+     GET_TEMP_RET0("getTempRet0"),
+     SET_TEMP_RET0("setTempRet0"),
      NEW_SIZE("newSize"),
      MODULE("module"),
      START("start"),
@@ -64,7 +66,7 @@ Name GROW_WASM_MEMORY("__growWasmMemory"),
      NEG_NAN("-nan"),
      CASE("case"),
      BR("br"),
-     ANYFUNC("anyfunc"),
+     FUNCREF("funcref"),
      FAKE_RETURN("fake_return_waka123"),
      MUT("mut"),
      SPECTEST("spectest"),
@@ -83,10 +85,10 @@ const char* getExpressionName(Expression* curr) {
     case Expression::Id::SwitchId: return "switch";
     case Expression::Id::CallId: return "call";
     case Expression::Id::CallIndirectId: return "call_indirect";
-    case Expression::Id::GetLocalId: return "get_local";
-    case Expression::Id::SetLocalId: return "set_local";
-    case Expression::Id::GetGlobalId: return "get_global";
-    case Expression::Id::SetGlobalId: return "set_global";
+    case Expression::Id::GetLocalId: return "local.get";
+    case Expression::Id::SetLocalId: return "local.set";
+    case Expression::Id::GetGlobalId: return "global.get";
+    case Expression::Id::SetGlobalId: return "global.set";
     case Expression::Id::LoadId: return "load";
     case Expression::Id::StoreId: return "store";
     case Expression::Id::ConstId: return "const";
@@ -102,8 +104,14 @@ const char* getExpressionName(Expression* curr) {
     case Expression::Id::AtomicRMWId: return "atomic_rmw";
     case Expression::Id::AtomicWaitId: return "atomic_wait";
     case Expression::Id::AtomicWakeId: return "atomic_wake";
-    default: WASM_UNREACHABLE();
+    case Expression::Id::SIMDExtractId: return "simd_extract";
+    case Expression::Id::SIMDReplaceId: return "simd_replace";
+    case Expression::Id::SIMDShuffleId: return "simd_shuffle";
+    case Expression::Id::SIMDBitselectId: return "simd_bitselect";
+    case Expression::Id::SIMDShiftId: return "simd_shift";
+    case Expression::Id::NumExpressionIds: WASM_UNREACHABLE();
   }
+  WASM_UNREACHABLE();
 }
 
 // core AST type checking
@@ -413,6 +421,56 @@ void AtomicWake::finalize() {
   }
 }
 
+void SIMDExtract::finalize() {
+  assert(vec);
+  switch (op) {
+    case ExtractLaneSVecI8x16:
+    case ExtractLaneUVecI8x16:
+    case ExtractLaneSVecI16x8:
+    case ExtractLaneUVecI16x8:
+    case ExtractLaneVecI32x4: type = i32; break;
+    case ExtractLaneVecI64x2: type = i64; break;
+    case ExtractLaneVecF32x4: type = f32; break;
+    case ExtractLaneVecF64x2: type = f64; break;
+    default: WASM_UNREACHABLE();
+  }
+  if (vec->type == unreachable) {
+    type = unreachable;
+  }
+}
+
+void SIMDReplace::finalize() {
+  assert(vec && value);
+  type = v128;
+  if (vec->type == unreachable || value->type == unreachable) {
+    type = unreachable;
+  }
+}
+
+void SIMDShuffle::finalize() {
+  assert(left && right);
+  type = v128;
+  if (left->type == unreachable || right->type == unreachable) {
+    type = unreachable;
+  }
+}
+
+void SIMDBitselect::finalize() {
+  assert(left && right && cond);
+  type = v128;
+  if (left->type == unreachable || right->type == unreachable || cond->type == unreachable) {
+    type = unreachable;
+  }
+}
+
+void SIMDShift::finalize() {
+  assert(vec && shift);
+  type = v128;
+  if (vec->type == unreachable || shift->type == unreachable) {
+    type = unreachable;
+  }
+}
+
 Const* Const::set(Literal value_) {
   value = value_;
   type = value.type;
@@ -464,11 +522,19 @@ void Unary::finalize() {
     case TruncUFloat32ToInt32:
     case TruncSFloat64ToInt32:
     case TruncUFloat64ToInt32:
+    case TruncSatSFloat32ToInt32:
+    case TruncSatUFloat32ToInt32:
+    case TruncSatSFloat64ToInt32:
+    case TruncSatUFloat64ToInt32:
     case ReinterpretFloat32: type = i32; break;
     case TruncSFloat32ToInt64:
     case TruncUFloat32ToInt64:
     case TruncSFloat64ToInt64:
     case TruncUFloat64ToInt64:
+    case TruncSatSFloat32ToInt64:
+    case TruncSatUFloat32ToInt64:
+    case TruncSatSFloat64ToInt64:
+    case TruncSatUFloat64ToInt64:
     case ReinterpretFloat64: type = i64; break;
     case ReinterpretInt32:
     case ConvertSInt32ToFloat32:
@@ -480,7 +546,40 @@ void Unary::finalize() {
     case ConvertUInt32ToFloat64:
     case ConvertSInt64ToFloat64:
     case ConvertUInt64ToFloat64: type = f64; break;
-    default: std::cerr << "waka " << op << '\n'; WASM_UNREACHABLE();
+    case SplatVecI8x16:
+    case SplatVecI16x8:
+    case SplatVecI32x4:
+    case SplatVecI64x2:
+    case SplatVecF32x4:
+    case SplatVecF64x2:
+    case NotVec128:
+    case NegVecI8x16:
+    case NegVecI16x8:
+    case NegVecI32x4:
+    case NegVecI64x2:
+    case AbsVecF32x4:
+    case NegVecF32x4:
+    case SqrtVecF32x4:
+    case AbsVecF64x2:
+    case NegVecF64x2:
+    case SqrtVecF64x2:
+    case TruncSatSVecF32x4ToVecI32x4:
+    case TruncSatUVecF32x4ToVecI32x4:
+    case TruncSatSVecF64x2ToVecI64x2:
+    case TruncSatUVecF64x2ToVecI64x2:
+    case ConvertSVecI32x4ToVecF32x4:
+    case ConvertUVecI32x4ToVecF32x4:
+    case ConvertSVecI64x2ToVecF64x2:
+    case ConvertUVecI64x2ToVecF64x2: type = v128; break;
+    case AnyTrueVecI8x16:
+    case AllTrueVecI8x16:
+    case AnyTrueVecI16x8:
+    case AllTrueVecI16x8:
+    case AnyTrueVecI32x4:
+    case AllTrueVecI32x4:
+    case AnyTrueVecI64x2:
+    case AllTrueVecI64x2: type = i32; break;
+    case InvalidUnary: WASM_UNREACHABLE();
   }
 }
 
@@ -565,7 +664,6 @@ void Host::finalize() {
       }
       break;
     }
-    default: WASM_UNREACHABLE();
   }
 }
 
@@ -636,6 +734,17 @@ Type Function::getLocalType(Index index) {
   }
 }
 
+void Function::clearNames() {
+  localNames.clear();
+}
+
+void Function::clearDebugInfo() {
+  localIndices.clear();
+  debugLocations.clear();
+  prologLocation.clear();
+  epilogLocation.clear();
+}
+
 FunctionType* Module::getFunctionType(Name name) {
   auto iter = functionTypesMap.find(name);
   if (iter == functionTypesMap.end()) {
@@ -700,15 +809,17 @@ Global* Module::getGlobalOrNull(Name name) {
   return iter->second;
 }
 
-void Module::addFunctionType(FunctionType* curr) {
+FunctionType* Module::addFunctionType(std::unique_ptr<FunctionType> curr) {
   if (!curr->name.is()) {
     Fatal() << "Module::addFunctionType: empty name";
   }
   if (getFunctionTypeOrNull(curr->name)) {
     Fatal() << "Module::addFunctionType: " << curr->name << " already exists";
   }
-  functionTypes.push_back(std::unique_ptr<FunctionType>(curr));
-  functionTypesMap[curr->name] = curr;
+  auto* p = curr.get();
+  functionTypes.emplace_back(std::move(curr));
+  functionTypesMap[p->name] = p;
+  return p;
 }
 
 void Module::addExport(Export* curr) {
@@ -807,6 +918,10 @@ void Module::updateMaps() {
   for (auto& curr : globals) {
     globalsMap[curr->name] = curr.get();
   }
+}
+
+void Module::clearDebugInfo() {
+  debugInfoFileNames.clear();
 }
 
 } // namespace wasm

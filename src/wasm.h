@@ -25,6 +25,7 @@
 #define wasm_wasm_h
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <map>
 #include <string>
@@ -37,12 +38,42 @@
 
 namespace wasm {
 
-enum Feature : uint32_t {
-  MVP = 0,
-  Atomics = 1 << 0,
-  All = 0xffffffff,
+struct FeatureSet {
+  enum Feature : uint32_t {
+    MVP = 0,
+    Atomics = 1 << 0,
+    MutableGlobals = 1 << 1,
+    TruncSat = 1 << 2,
+    SIMD = 1 << 3,
+    All = Atomics | MutableGlobals | TruncSat | SIMD
+  };
+
+  FeatureSet() : features(MVP) {}
+  FeatureSet(uint32_t features) : features(features) {}
+
+  bool isMVP() const { return features == MVP; }
+  bool has(Feature f) { return (features & f) == f; }
+  bool hasAtomics() const { return features & Atomics; }
+  bool hasMutableGlobals() const { return features & MutableGlobals; }
+  bool hasTruncSat() const { return features & TruncSat; }
+  bool hasSIMD() const { return features & SIMD; }
+  bool hasAll() const { return features & All; }
+
+  void makeMVP() { features = MVP; }
+  void set(Feature f, bool v = true) { features = v ? (features | f) : (features & ~f); }
+  void setAtomics(bool v = true) { set(Atomics, v); }
+  void setMutableGlobals(bool v = true) { set(MutableGlobals, v); }
+  void setTruncSat(bool v = true) { set(TruncSat, v); }
+  void setSIMD(bool v = true) { set(SIMD, v); }
+  void setAll(bool v = true) { features = v ? All : MVP; }
+
+  bool operator<=(const FeatureSet& other) {
+    return !(features & ~other.features);
+  }
+
+private:
+  uint32_t features;
 };
-typedef uint32_t FeatureSet;
 
 // An index in a wasm module
 typedef uint32_t Index;
@@ -90,6 +121,18 @@ enum UnaryOp {
   // Extend signed subword-sized integer. This differs from e.g. ExtendSInt32
   // because the input integer is in an i64 value insetad of an i32 value.
   ExtendS8Int32, ExtendS16Int32, ExtendS8Int64, ExtendS16Int64, ExtendS32Int64,
+  // Saturating float-to-int
+  TruncSatSFloat32ToInt32, TruncSatUFloat32ToInt32, TruncSatSFloat64ToInt32, TruncSatUFloat64ToInt32,
+  TruncSatSFloat32ToInt64, TruncSatUFloat32ToInt64, TruncSatSFloat64ToInt64, TruncSatUFloat64ToInt64,
+  // SIMD splats
+  SplatVecI8x16, SplatVecI16x8, SplatVecI32x4, SplatVecI64x2, SplatVecF32x4, SplatVecF64x2,
+  // SIMD arithmetic
+  NotVec128,
+  NegVecI8x16, AnyTrueVecI8x16, AllTrueVecI8x16, NegVecI16x8, AnyTrueVecI16x8, AllTrueVecI16x8,
+  NegVecI32x4, AnyTrueVecI32x4, AllTrueVecI32x4, NegVecI64x2, AnyTrueVecI64x2, AllTrueVecI64x2,
+  AbsVecF32x4, NegVecF32x4, SqrtVecF32x4, AbsVecF64x2, NegVecF64x2, SqrtVecF64x2,
+  TruncSatSVecF32x4ToVecI32x4, TruncSatUVecF32x4ToVecI32x4, TruncSatSVecF64x2ToVecI64x2, TruncSatUVecF64x2ToVecI64x2,
+  ConvertSVecI32x4ToVecF32x4, ConvertUVecI32x4ToVecF32x4, ConvertSVecI64x2ToVecF64x2, ConvertUVecI64x2ToVecF64x2,
 
   InvalidUnary
 };
@@ -118,6 +161,19 @@ enum BinaryOp {
   // relational ops
   EqFloat64, NeFloat64, // int or float
   LtFloat64, LeFloat64, GtFloat64, GeFloat64, // float
+  // SIMD relational ops (return vectors)
+  EqVecI8x16, NeVecI8x16, LtSVecI8x16, LtUVecI8x16, GtSVecI8x16, GtUVecI8x16, LeSVecI8x16, LeUVecI8x16, GeSVecI8x16, GeUVecI8x16,
+  EqVecI16x8, NeVecI16x8, LtSVecI16x8, LtUVecI16x8, GtSVecI16x8, GtUVecI16x8, LeSVecI16x8, LeUVecI16x8, GeSVecI16x8, GeUVecI16x8,
+  EqVecI32x4, NeVecI32x4, LtSVecI32x4, LtUVecI32x4, GtSVecI32x4, GtUVecI32x4, LeSVecI32x4, LeUVecI32x4, GeSVecI32x4, GeUVecI32x4,
+  EqVecF32x4, NeVecF32x4, LtVecF32x4, GtVecF32x4, LeVecF32x4, GeVecF32x4,
+  EqVecF64x2, NeVecF64x2, LtVecF64x2, GtVecF64x2, LeVecF64x2, GeVecF64x2,
+  // SIMD arithmetic
+  AndVec128, OrVec128, XorVec128,
+  AddVecI8x16, AddSatSVecI8x16, AddSatUVecI8x16, SubVecI8x16, SubSatSVecI8x16, SubSatUVecI8x16, MulVecI8x16,
+  AddVecI16x8, AddSatSVecI16x8, AddSatUVecI16x8, SubVecI16x8, SubSatSVecI16x8, SubSatUVecI16x8, MulVecI16x8,
+  AddVecI32x4, SubVecI32x4, MulVecI32x4, AddVecI64x2, SubVecI64x2,
+  AddVecF32x4, SubVecF32x4, MulVecF32x4, DivVecF32x4, MinVecF32x4, MaxVecF32x4,
+  AddVecF64x2, SubVecF64x2, MulVecF64x2, DivVecF64x2, MinVecF64x2, MaxVecF64x2,
 
   InvalidBinary
 };
@@ -128,6 +184,20 @@ enum HostOp {
 
 enum AtomicRMWOp {
   Add, Sub, And, Or, Xor, Xchg
+};
+
+enum SIMDExtractOp {
+  ExtractLaneSVecI8x16, ExtractLaneUVecI8x16, ExtractLaneSVecI16x8, ExtractLaneUVecI16x8,
+  ExtractLaneVecI32x4, ExtractLaneVecI64x2, ExtractLaneVecF32x4, ExtractLaneVecF64x2
+};
+
+enum SIMDReplaceOp {
+  ReplaceLaneVecI8x16, ReplaceLaneVecI16x8, ReplaceLaneVecI32x4, ReplaceLaneVecI64x2, ReplaceLaneVecF32x4, ReplaceLaneVecF64x2
+};
+
+enum SIMDShiftOp {
+  ShlVecI8x16, ShrSVecI8x16, ShrUVecI8x16, ShlVecI16x8, ShrSVecI16x8, ShrUVecI16x8,
+  ShlVecI32x4, ShrSVecI32x4, ShrUVecI32x4, ShlVecI64x2, ShrSVecI64x2, ShrUVecI64x2
 };
 
 //
@@ -180,13 +250,19 @@ public:
     AtomicCmpxchgId,
     AtomicWaitId,
     AtomicWakeId,
+    SIMDExtractId,
+    SIMDReplaceId,
+    SIMDShuffleId,
+    SIMDBitselectId,
+    SIMDShiftId,
     NumExpressionIds
   };
   Id _id;
 
-  Type type; // the type of the expression: its *output*, not necessarily its input(s)
+  // the type of the expression: its *output*, not necessarily its input(s)
+  Type type = none;
 
-  Expression(Id id) : _id(id), type(none) {}
+  Expression(Id id) : _id(id) {}
 
   void finalize() {}
 
@@ -223,7 +299,7 @@ public:
 
 class Nop : public SpecificExpression<Expression::NopId> {
 public:
-  Nop() {}
+  Nop() = default;
   Nop(MixedArena& allocator) {}
 };
 
@@ -270,7 +346,7 @@ public:
 
 class Loop : public SpecificExpression<Expression::LoopId> {
 public:
-  Loop() {}
+  Loop() = default;
   Loop(MixedArena& allocator) {}
 
   Name name;
@@ -301,14 +377,14 @@ public:
 
 class Switch : public SpecificExpression<Expression::SwitchId> {
 public:
-  Switch(MixedArena& allocator) : targets(allocator), condition(nullptr), value(nullptr) {
+  Switch(MixedArena& allocator) : targets(allocator) {
     type = unreachable;
   }
 
   ArenaVector<Name> targets;
   Name default_;
-  Expression* condition;
-  Expression* value;
+  Expression* condition = nullptr;
+  Expression* value = nullptr;
 
   void finalize();
 };
@@ -326,10 +402,10 @@ public:
 class FunctionType {
 public:
   Name name;
-  Type result;
+  Type result = none;
   std::vector<Type> params;
 
-  FunctionType() : result(none) {}
+  FunctionType() = default;
 
   bool structuralComparison(FunctionType& b);
 
@@ -350,7 +426,7 @@ public:
 
 class GetLocal : public SpecificExpression<Expression::GetLocalId> {
 public:
-  GetLocal() {}
+  GetLocal() = default;
   GetLocal(MixedArena& allocator) {}
 
   Index index;
@@ -358,7 +434,7 @@ public:
 
 class SetLocal : public SpecificExpression<Expression::SetLocalId> {
 public:
-  SetLocal() {}
+  SetLocal() = default;
   SetLocal(MixedArena& allocator) {}
 
   void finalize();
@@ -372,7 +448,7 @@ public:
 
 class GetGlobal : public SpecificExpression<Expression::GetGlobalId> {
 public:
-  GetGlobal() {}
+  GetGlobal() = default;
   GetGlobal(MixedArena& allocator) {}
 
   Name name;
@@ -380,7 +456,7 @@ public:
 
 class SetGlobal : public SpecificExpression<Expression::SetGlobalId> {
 public:
-  SetGlobal() {}
+  SetGlobal() = default;
   SetGlobal(MixedArena& allocator) {}
 
   Name name;
@@ -391,7 +467,7 @@ public:
 
 class Load : public SpecificExpression<Expression::LoadId> {
 public:
-  Load() {}
+  Load() = default;
   Load(MixedArena& allocator) {}
 
   uint8_t bytes;
@@ -408,7 +484,7 @@ public:
 
 class Store : public SpecificExpression<Expression::StoreId> {
 public:
-  Store() : valueType(none) {}
+  Store() = default;
   Store(MixedArena& allocator) : Store() {}
 
   uint8_t bytes;
@@ -417,7 +493,7 @@ public:
   bool isAtomic;
   Expression* ptr;
   Expression* value;
-  Type valueType; // the store never returns a value
+  Type valueType;
 
   void finalize();
 };
@@ -476,9 +552,70 @@ class AtomicWake : public SpecificExpression<Expression::AtomicWakeId> {
   void finalize();
 };
 
+class SIMDExtract : public SpecificExpression<Expression::SIMDExtractId> {
+ public:
+  SIMDExtract() = default;
+  SIMDExtract(MixedArena& allocator) : SIMDExtract() {}
+
+  SIMDExtractOp op;
+  Expression* vec;
+  uint8_t index;
+
+  void finalize();
+};
+
+class SIMDReplace : public SpecificExpression<Expression::SIMDReplaceId> {
+ public:
+  SIMDReplace() = default;
+  SIMDReplace(MixedArena& allocator) : SIMDReplace() {}
+
+  SIMDReplaceOp op;
+  Expression* vec;
+  uint8_t index;
+  Expression* value;
+
+  void finalize();
+};
+
+class SIMDShuffle : public SpecificExpression<Expression::SIMDShuffleId> {
+ public:
+  SIMDShuffle() = default;
+  SIMDShuffle(MixedArena& allocator) : SIMDShuffle() {}
+
+  Expression* left;
+  Expression* right;
+  std::array<uint8_t, 16> mask;
+
+  void finalize();
+};
+
+class SIMDBitselect : public SpecificExpression<Expression::SIMDBitselectId> {
+ public:
+  SIMDBitselect() = default;
+  SIMDBitselect(MixedArena& allocator) : SIMDBitselect() {}
+
+  Expression* left;
+  Expression* right;
+  Expression* cond;
+
+  void finalize();
+};
+
+class SIMDShift : public SpecificExpression<Expression::SIMDShiftId> {
+ public:
+  SIMDShift() = default;
+  SIMDShift(MixedArena& allocator) : SIMDShift() {}
+
+  SIMDShiftOp op;
+  Expression* vec;
+  Expression* shift;
+
+  void finalize();
+};
+
 class Const : public SpecificExpression<Expression::ConstId> {
 public:
-  Const() {}
+  Const() = default;
   Const(MixedArena& allocator) {}
 
   Literal value;
@@ -490,7 +627,7 @@ public:
 
 class Unary : public SpecificExpression<Expression::UnaryId> {
 public:
-  Unary() {}
+  Unary() = default;
   Unary(MixedArena& allocator) {}
 
   UnaryOp op;
@@ -503,7 +640,7 @@ public:
 
 class Binary : public SpecificExpression<Expression::BinaryId> {
 public:
-  Binary() {}
+  Binary() = default;
   Binary(MixedArena& allocator) {}
 
   BinaryOp op;
@@ -520,7 +657,7 @@ public:
 
 class Select : public SpecificExpression<Expression::SelectId> {
 public:
-  Select() {}
+  Select() = default;
   Select(MixedArena& allocator) {}
 
   Expression* ifTrue;
@@ -532,7 +669,7 @@ public:
 
 class Drop : public SpecificExpression<Expression::DropId> {
 public:
-  Drop() {}
+  Drop() = default;
   Drop(MixedArena& allocator) {}
 
   Expression* value;
@@ -542,12 +679,12 @@ public:
 
 class Return : public SpecificExpression<Expression::ReturnId> {
 public:
-  Return() : value(nullptr) {
+  Return() {
     type = unreachable;
   }
   Return(MixedArena& allocator) : Return() {}
 
-  Expression* value;
+  Expression* value = nullptr;
 };
 
 class Host : public SpecificExpression<Expression::HostId> {
@@ -641,6 +778,9 @@ public:
   Name getLocalNameOrGeneric(Index index);
 
   bool hasLocalName(Index index) const;
+
+  void clearNames();
+  void clearDebugInfo();
 };
 
 // The kind of an import or export.
@@ -669,7 +809,7 @@ public:
   struct Segment {
     Expression* offset;
     std::vector<Name> data;
-    Segment() {}
+    Segment() = default;
     Segment(Expression* offset) : offset(offset) {}
     Segment(Expression* offset, std::vector<Name>& init) : offset(offset) {
       data.swap(init);
@@ -678,12 +818,13 @@ public:
 
   // Currently the wasm object always 'has' one Table. It 'exists' if it has been defined or imported.
   // The table can exist but be empty and have no defined initial or max size.
-  bool exists;
+  bool exists = false;
   Name name;
-  Address initial, max;
+  Address initial = 0;
+  Address max = kMaxSize;
   std::vector<Segment> segments;
 
-  Table() : exists(false), initial(0), max(kMaxSize) {
+  Table() {
     name = Name::fromInt(0);
   }
   bool hasMax() { return max != kUnlimitedSize; }
@@ -700,7 +841,7 @@ public:
   struct Segment {
     Expression* offset;
     std::vector<char> data; // TODO: optimize
-    Segment() {}
+    Segment() = default;
     Segment(Expression* offset) : offset(offset) {}
     Segment(Expression* offset, const char* init, Address size) : offset(offset) {
       data.resize(size);
@@ -711,15 +852,16 @@ public:
     }
   };
 
+  bool exists = false;
   Name name;
-  Address initial, max; // sizes are in pages
+  Address initial = 0; // sizes are in pages
+  Address max = kMaxSize;
   std::vector<Segment> segments;
 
   // See comment in Table.
-  bool exists;
-  bool shared;
+  bool shared = false;
 
-  Memory() : initial(0), max(kMaxSize), exists(false), shared(false) {
+  Memory() {
     name = Name::fromInt(0);
   }
   bool hasMax() { return max != kUnlimitedSize; }
@@ -766,7 +908,7 @@ private:
   std::map<Name, Global*> globalsMap;
 
 public:
-  Module() {};
+  Module() = default;;
 
   FunctionType* getFunctionType(Name name);
   Export* getExport(Name name);
@@ -778,7 +920,7 @@ public:
   Function* getFunctionOrNull(Name name);
   Global* getGlobalOrNull(Name name);
 
-  void addFunctionType(FunctionType* curr);
+  FunctionType* addFunctionType(std::unique_ptr<FunctionType> curr);
   void addExport(Export* curr);
   void addFunction(Function* curr);
   void addGlobal(Global* curr);
@@ -791,6 +933,8 @@ public:
   void removeGlobal(Name name);
 
   void updateMaps();
+
+  void clearDebugInfo();
 };
 
 } // namespace wasm

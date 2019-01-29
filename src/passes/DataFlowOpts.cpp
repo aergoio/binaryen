@@ -88,7 +88,7 @@ struct DataFlowOpts : public WalkerPass<PostWalker<DataFlowOpts>> {
     //       then copy the result if it's smaller.
     if (node->isPhi() && DataFlow::allInputsIdentical(node)) {
       // Note we don't need to check for effects when replacing, as in
-      // flattened IR expression children are get_locals or consts.
+      // flattened IR expression children are local.gets or consts.
       auto* value = node->getValue(1);
       if (value->isConst()) {
         replaceAllUsesWith(node, value);
@@ -112,16 +112,16 @@ struct DataFlowOpts : public WalkerPass<PostWalker<DataFlowOpts>> {
     //dump(node, std::cout);
     auto* expr = node->expr;
     // First, note that some of the expression's children may be
-    // get_locals that we inferred during SSA analysis as constant.
+    // local.gets that we inferred during SSA analysis as constant.
     // We can apply those now.
     for (Index i = 0; i < node->values.size(); i++) {
       if (node->values[i]->isConst()) {
         auto* currp = getIndexPointer(expr, i);
-        if (!(*currp)->is<Const>()) {
-          // Directly represent it as a constant.
-          auto* c = node->values[i]->expr->dynCast<Const>();
-          *currp = Builder(*getModule()).makeConst(c->value);
-        }
+        // Directly represent it as a constant. (Note that it may already be
+        // a constant, but for now to avoid corner cases just replace them
+        // all here.)
+        auto* c = node->values[i]->expr->dynCast<Const>();
+        *currp = Builder(*getModule()).makeConst(c->value);
       }
     }
     // Now we know that all our DataFlow inputs are constant, and all
