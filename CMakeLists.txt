@@ -185,7 +185,9 @@ SET(binaryen_SOURCES
   src/passes/MergeBlocks.cpp
   src/passes/MergeLocals.cpp
   src/passes/Metrics.cpp
+  src/passes/MinifyImportsAndExports.cpp
   src/passes/NameList.cpp
+  src/passes/NoExitRuntime.cpp
   src/passes/OptimizeInstructions.cpp
   src/passes/PickLoadSigns.cpp
   src/passes/PostEmscripten.cpp
@@ -193,6 +195,7 @@ SET(binaryen_SOURCES
   src/passes/Print.cpp
   src/passes/PrintCallGraph.cpp
   src/passes/StackIR.cpp
+  src/passes/Strip.cpp
   src/passes/RedundantSetElimination.cpp
   src/passes/RelooperJumpThreading.cpp
   src/passes/ReReloop.cpp
@@ -231,6 +234,7 @@ SET(binaryen_SOURCES
   src/ir/ExpressionAnalyzer.cpp
   src/ir/ExpressionManipulator.cpp
   src/ir/LocalGraph.cpp
+  src/ir/ReFinalize.cpp
   src/cfg/Relooper.cpp
   src/support/archive.cpp
   src/support/bits.cpp
