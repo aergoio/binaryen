@@ -116,12 +116,16 @@ BinaryenExpressionId BinaryenUnreachableId(void);
 BinaryenExpressionId BinaryenAtomicCmpxchgId(void);
 BinaryenExpressionId BinaryenAtomicRMWId(void);
 BinaryenExpressionId BinaryenAtomicWaitId(void);
-BinaryenExpressionId BinaryenAtomicWakeId(void);
+BinaryenExpressionId BinaryenAtomicNotifyId(void);
 BinaryenExpressionId BinaryenSIMDExtractId(void);
 BinaryenExpressionId BinaryenSIMDReplaceId(void);
 BinaryenExpressionId BinaryenSIMDShuffleId(void);
 BinaryenExpressionId BinaryenSIMDBitselectId(void);
 BinaryenExpressionId BinaryenSIMDShiftId(void);
+BinaryenExpressionId BinaryenMemoryInitId(void);
+BinaryenExpressionId BinaryenDataDropId(void);
+BinaryenExpressionId BinaryenMemoryCopyId(void);
+BinaryenExpressionId BinaryenMemoryFillId(void);
 
 // External kinds (call to get the value of each; you can cache them)
 
@@ -534,12 +538,16 @@ BinaryenExpressionRef BinaryenAtomicStore(BinaryenModuleRef module, uint32_t byt
 BinaryenExpressionRef BinaryenAtomicRMW(BinaryenModuleRef module, BinaryenOp op, BinaryenIndex bytes, BinaryenIndex offset, BinaryenExpressionRef ptr, BinaryenExpressionRef value, BinaryenType type);
 BinaryenExpressionRef BinaryenAtomicCmpxchg(BinaryenModuleRef module, BinaryenIndex bytes, BinaryenIndex offset, BinaryenExpressionRef ptr, BinaryenExpressionRef expected, BinaryenExpressionRef replacement, BinaryenType type);
 BinaryenExpressionRef BinaryenAtomicWait(BinaryenModuleRef module, BinaryenExpressionRef ptr, BinaryenExpressionRef expected, BinaryenExpressionRef timeout, BinaryenType type);
-BinaryenExpressionRef BinaryenAtomicWake(BinaryenModuleRef module, BinaryenExpressionRef ptr, BinaryenExpressionRef wakeCount);
+BinaryenExpressionRef BinaryenAtomicNotify(BinaryenModuleRef module, BinaryenExpressionRef ptr, BinaryenExpressionRef notifyCount);
 BinaryenExpressionRef BinaryenSIMDExtract(BinaryenModuleRef module, BinaryenOp op, BinaryenExpressionRef vec, uint8_t index);
 BinaryenExpressionRef BinaryenSIMDReplace(BinaryenModuleRef module, BinaryenOp op, BinaryenExpressionRef vec, uint8_t index, BinaryenExpressionRef value);
 BinaryenExpressionRef BinaryenSIMDShuffle(BinaryenModuleRef module, BinaryenExpressionRef left, BinaryenExpressionRef right, const uint8_t mask[16]);
 BinaryenExpressionRef BinaryenSIMDBitselect(BinaryenModuleRef module, BinaryenExpressionRef left, BinaryenExpressionRef right, BinaryenExpressionRef cond);
 BinaryenExpressionRef BinaryenSIMDShift(BinaryenModuleRef module, BinaryenOp op, BinaryenExpressionRef vec, BinaryenExpressionRef shift);
+BinaryenExpressionRef BinaryenMemoryInit(BinaryenModuleRef module, uint32_t segment, BinaryenExpressionRef dest, BinaryenExpressionRef offset, BinaryenExpressionRef size);
+BinaryenExpressionRef BinaryenDataDrop(BinaryenModuleRef module, uint32_t segment);
+BinaryenExpressionRef BinaryenMemoryCopy(BinaryenModuleRef module, BinaryenExpressionRef dest, BinaryenExpressionRef source, BinaryenExpressionRef size);
+BinaryenExpressionRef BinaryenMemoryFill(BinaryenModuleRef module, BinaryenExpressionRef dest, BinaryenExpressionRef value, BinaryenExpressionRef size);
 
 BinaryenExpressionId BinaryenExpressionGetId(BinaryenExpressionRef expr);
 BinaryenType BinaryenExpressionGetType(BinaryenExpressionRef expr);
@@ -610,6 +618,7 @@ int32_t BinaryenConstGetValueI64Low(BinaryenExpressionRef expr);
 int32_t BinaryenConstGetValueI64High(BinaryenExpressionRef expr);
 float BinaryenConstGetValueF32(BinaryenExpressionRef expr);
 double BinaryenConstGetValueF64(BinaryenExpressionRef expr);
+void BinaryenConstGetValueV128(BinaryenExpressionRef expr, uint8_t* out);
 
 BinaryenOp BinaryenUnaryGetOp(BinaryenExpressionRef expr);
 BinaryenExpressionRef BinaryenUnaryGetValue(BinaryenExpressionRef expr);
@@ -643,8 +652,8 @@ BinaryenExpressionRef BinaryenAtomicWaitGetExpected(BinaryenExpressionRef expr);
 BinaryenExpressionRef BinaryenAtomicWaitGetTimeout(BinaryenExpressionRef expr);
 BinaryenType BinaryenAtomicWaitGetExpectedType(BinaryenExpressionRef expr);
 
-BinaryenExpressionRef BinaryenAtomicWakeGetPtr(BinaryenExpressionRef expr);
-BinaryenExpressionRef BinaryenAtomicWakeGetWakeCount(BinaryenExpressionRef expr);
+BinaryenExpressionRef BinaryenAtomicNotifyGetPtr(BinaryenExpressionRef expr);
+BinaryenExpressionRef BinaryenAtomicNotifyGetNotifyCount(BinaryenExpressionRef expr);
 
 BinaryenOp BinaryenSIMDExtractGetOp(BinaryenExpressionRef expr);
 BinaryenExpressionRef BinaryenSIMDExtractGetVec(BinaryenExpressionRef expr);
@@ -667,6 +676,20 @@ BinaryenOp BinaryenSIMDShiftGetOp(BinaryenExpressionRef expr);
 BinaryenExpressionRef BinaryenSIMDShiftGetVec(BinaryenExpressionRef expr);
 BinaryenExpressionRef BinaryenSIMDShiftGetShift(BinaryenExpressionRef expr);
 
+uint32_t BinaryenMemoryInitGetSegment(BinaryenExpressionRef expr);
+BinaryenExpressionRef BinaryenMemoryInitGetDest(BinaryenExpressionRef expr);
+BinaryenExpressionRef BinaryenMemoryInitGetOffset(BinaryenExpressionRef expr);
+BinaryenExpressionRef BinaryenMemoryInitGetSize(BinaryenExpressionRef expr);
+
+uint32_t BinaryenDataDropGetSegment(BinaryenExpressionRef expr);
+
+BinaryenExpressionRef BinaryenMemoryCopyGetDest(BinaryenExpressionRef expr);
+BinaryenExpressionRef BinaryenMemoryCopyGetSource(BinaryenExpressionRef expr);
+BinaryenExpressionRef BinaryenMemoryCopyGetSize(BinaryenExpressionRef expr);
+
+BinaryenExpressionRef BinaryenMemoryFillGetDest(BinaryenExpressionRef expr);
+BinaryenExpressionRef BinaryenMemoryFillGetValue(BinaryenExpressionRef expr);
+BinaryenExpressionRef BinaryenMemoryFillGetSize(BinaryenExpressionRef expr);
 
 // Functions
 

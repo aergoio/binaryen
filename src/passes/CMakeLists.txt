@@ -3,6 +3,8 @@ add_custom_command(
   COMMAND python ${PROJECT_SOURCE_DIR}/scripts/embedwast.py ${PROJECT_SOURCE_DIR}/src/passes/wasm-intrinsics.wast ${CMAKE_CURRENT_BINARY_DIR}/WasmIntrinsics.cpp
   DEPENDS ${PROJECT_SOURCE_DIR}/scripts/embedwast.py wasm-intrinsics.wast)
 
+add_custom_target(GenerateWasmIntrinsics DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/WasmIntrinsics.cpp)
+
 SET(passes_SOURCES
   pass.cpp
   CoalesceLocals.cpp
@@ -12,6 +14,7 @@ SET(passes_SOURCES
   DataFlowOpts.cpp
   DeadArgumentElimination.cpp
   DeadCodeElimination.cpp
+  Directize.cpp
   DuplicateFunctionElimination.cpp
   ExtractFunction.cpp
   Flatten.cpp
@@ -31,6 +34,7 @@ SET(passes_SOURCES
   MinifyImportsAndExports.cpp
   NameList.cpp
   NoExitRuntime.cpp
+  OptimizeAddedConstants.cpp
   OptimizeInstructions.cpp
   PickLoadSigns.cpp
   PostEmscripten.cpp
@@ -60,4 +64,5 @@ SET(passes_SOURCES
   Vacuum.cpp
   ${CMAKE_CURRENT_BINARY_DIR}/WasmIntrinsics.cpp
 )
-ADD_LIBRARY(passes STATIC ${passes_SOURCES})
+#ADD_LIBRARY(passes STATIC ${passes_SOURCES})
+ADD_SOURCES(${passes_SOURCES})

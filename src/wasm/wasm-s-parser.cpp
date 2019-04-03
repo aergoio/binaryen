@@ -641,6 +641,16 @@ Type SExpressionWasmBuilder::stringToType(const char* str, bool allowError, bool
   throw ParseException("invalid wasm type");
 }
 
+Type SExpressionWasmBuilder::stringToLaneType(const char* str) {
+  if (strcmp(str, "i8x16") == 0) return i32;
+  if (strcmp(str, "i16x8") == 0) return i32;
+  if (strcmp(str, "i32x4") == 0) return i32;
+  if (strcmp(str, "i64x2") == 0) return i64;
+  if (strcmp(str, "f32x4") == 0) return f32;
+  if (strcmp(str, "f64x2") == 0) return f64;
+  return none;
+}
+
 Function::DebugLocation SExpressionWasmBuilder::getDebugLocation(const SourceLocation& loc) {
   IString file = loc.filename;
   auto& debugInfoFileNames = wasm.debugInfoFileNames;
@@ -786,6 +796,7 @@ Expression* SExpressionWasmBuilder::makeSetGlobal(Element& s) {
 
 
 Expression* SExpressionWasmBuilder::makeBlock(Element& s) {
+  if (!currFunction) throw ParseException("block is unallowed outside of functions");
   // special-case Block, because Block nesting (in their first element) can be incredibly deep
   auto curr = allocator.alloc<Block>();
   auto* sp = &s;
@@ -863,6 +874,20 @@ Expression* SExpressionWasmBuilder::makeThenOrElse(Element& s) {
   return ret;
 }
 
+template<int Lanes>
+static Literal makeLanes(Element& s, MixedArena& allocator, Type lane_t) {
+  std::array<Literal, Lanes> lanes;
+  for (size_t i = 0; i < Lanes; ++i) {
+    Expression* lane = parseConst(s[i+2]->str(), lane_t, allocator);
+    if (lane) {
+      lanes[i] = lane->cast<Const>()->value;
+    } else {
+      throw ParseException("Could not parse v128 lane");
+    }
+  }
+  return Literal(lanes);
+}
+
 Expression* SExpressionWasmBuilder::makeConst(Element& s, Type type) {
   if (type != v128) {
     auto ret = parseConst(s[1]->str(), type, allocator);
@@ -871,57 +896,35 @@ Expression* SExpressionWasmBuilder::makeConst(Element& s, Type type) {
   }
 
   auto ret = allocator.alloc<Const>();
-  auto getLiteral = [](Expression* expr) {
-    if (expr == nullptr) {
-      throw ParseException("Could not parse v128 lane");
-    }
-    return expr->cast<Const>()->value;
-  };
-  Type lane_t = stringToType(s[1]->str());
+  Type lane_t = stringToLaneType(s[1]->str().str);
   size_t lanes = s.size() - 2;
   switch (lanes) {
     case 2: {
       if (lane_t != i64 && lane_t != f64) {
         throw ParseException("Unexpected v128 literal lane type");
       }
-      std::array<Literal, 2> lanes;
-      for (size_t i = 0; i < 2; ++i) {
-        lanes[i] = getLiteral(parseConst(s[i+2]->str(), lane_t, allocator));
-      }
-      ret->value = Literal(lanes);
+      ret->value = makeLanes<2>(s, allocator, lane_t);
       break;
     }
     case 4: {
       if (lane_t != i32 && lane_t != f32) {
         throw ParseException("Unexpected v128 literal lane type");
       }
-      std::array<Literal, 4> lanes;
-      for (size_t i = 0; i < 4; ++i) {
-        lanes[i] = getLiteral(parseConst(s[i+2]->str(), lane_t, allocator));
-      }
-      ret->value = Literal(lanes);
+      ret->value = makeLanes<4>(s, allocator, lane_t);
       break;
     }
     case 8: {
       if (lane_t != i32) {
         throw ParseException("Unexpected v128 literal lane type");
       }
-      std::array<Literal, 8> lanes;
-      for (size_t i = 0; i < 8; ++i) {
-        lanes[i] = getLiteral(parseConst(s[i+2]->str(), lane_t, allocator));
-      }
-      ret->value = Literal(lanes);
+      ret->value = makeLanes<8>(s, allocator, lane_t);
       break;
     }
     case 16: {
       if (lane_t != i32) {
         throw ParseException("Unexpected v128 literal lane type");
       }
-      std::array<Literal, 16> lanes;
-      for (size_t i = 0; i < 16; ++i) {
-        lanes[i] = getLiteral(parseConst(s[i+2]->str(), lane_t, allocator));
-      }
-      ret->value = Literal(lanes);
+      ret->value = makeLanes<16>(s, allocator, lane_t);
       break;
     }
     default: throw ParseException("Unexpected number of lanes in v128 literal");
@@ -965,10 +968,10 @@ static size_t parseMemAttributes(Element& s, Address* offset, Address* align, Ad
       throw ParseException("bad memory attribute immediate", s.line, s.col);
     }
     if (str[0] == 'a') {
-      if (value > std::numeric_limits<uint32_t>::max()) throw ParseException("bad align");
+      if (value > std::numeric_limits<uint32_t>::max()) throw ParseException("bad align", s.line, s.col);
       *align = value;
     } else if (str[0] == 'o') {
-      if (value > std::numeric_limits<uint32_t>::max()) throw ParseException("bad offset");
+      if (value > std::numeric_limits<uint32_t>::max()) throw ParseException("bad offset", s.line, s.col);
       *offset = value;
     } else throw ParseException("bad memory attribute");
     i++;
@@ -1068,11 +1071,11 @@ Expression* SExpressionWasmBuilder::makeAtomicWait(Element& s, Type type) {
   return ret;
 }
 
-Expression* SExpressionWasmBuilder::makeAtomicWake(Element& s) {
-  auto ret = allocator.alloc<AtomicWake>();
+Expression* SExpressionWasmBuilder::makeAtomicNotify(Element& s) {
+  auto ret = allocator.alloc<AtomicNotify>();
   ret->type = i32;
   ret->ptr = parseExpression(s[1]);
-  ret->wakeCount = parseExpression(s[2]);
+  ret->notifyCount = parseExpression(s[2]);
   ret->finalize();
   return ret;
 }
@@ -1130,6 +1133,41 @@ Expression* SExpressionWasmBuilder::makeSIMDShift(Element& s, SIMDShiftOp op) {
   ret->op = op;
   ret->vec = parseExpression(s[1]);
   ret->shift = parseExpression(s[2]);
+  ret->finalize();
+  return ret;
+}
+
+Expression* SExpressionWasmBuilder::makeMemoryInit(Element& s) {
+  auto ret = allocator.alloc<MemoryInit>();
+  ret->segment = atoi(s[1]->str().c_str());
+  ret->dest = parseExpression(s[2]);
+  ret->offset = parseExpression(s[3]);
+  ret->size = parseExpression(s[4]);
+  ret->finalize();
+  return ret;
+}
+
+Expression* SExpressionWasmBuilder::makeDataDrop(Element& s) {
+  auto ret = allocator.alloc<DataDrop>();
+  ret->segment = atoi(s[1]->str().c_str());
+  ret->finalize();
+  return ret;
+}
+
+Expression* SExpressionWasmBuilder::makeMemoryCopy(Element& s) {
+  auto ret = allocator.alloc<MemoryCopy>();
+  ret->dest = parseExpression(s[1]);
+  ret->source = parseExpression(s[2]);
+  ret->size = parseExpression(s[3]);
+  ret->finalize();
+  return ret;
+}
+
+Expression* SExpressionWasmBuilder::makeMemoryFill(Element& s) {
+  auto ret = allocator.alloc<MemoryFill>();
+  ret->dest = parseExpression(s[1]);
+  ret->value = parseExpression(s[2]);
+  ret->size = parseExpression(s[3]);
   ret->finalize();
   return ret;
 }

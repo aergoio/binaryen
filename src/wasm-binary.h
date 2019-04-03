@@ -344,6 +344,8 @@ extern const char* Name;
 extern const char* SourceMapUrl;
 extern const char* Dylink;
 extern const char* Linking;
+extern const char* Producers;
+extern const char* TargetFeatures;
 
 enum Subsection {
   NameFunction = 1,
@@ -549,13 +551,13 @@ enum ASTNodes {
   I64ExtendS16 = 0xc3,
   I64ExtendS32 = 0xc4,
 
-  TruncSatPrefix = 0xfc,
+  MiscPrefix = 0xfc,
   SIMDPrefix = 0xfd,
   AtomicPrefix = 0xfe
 };
 
 enum AtomicOpcodes {
-  AtomicWake = 0x00,
+  AtomicNotify = 0x00,
   I32AtomicWait = 0x01,
   I64AtomicWait = 0x02,
 
@@ -784,6 +786,13 @@ enum SIMDOpcodes {
   F64x2ConvertUI64x2 = 0xb2
 };
 
+enum BulkMemoryOpcodes {
+  MemoryInit = 0x08,
+  DataDrop = 0x09,
+  MemoryCopy = 0x0a,
+  MemoryFill = 0x0b
+};
+
 enum MemoryAccess {
   Offset = 0x10,     // bit 4
   Alignment = 0x80,  // bit 7
@@ -953,7 +962,8 @@ public:
 
   void read();
   void readUserSection(size_t payloadLen);
-  bool more() { return pos < input.size();}
+
+  bool more() { return pos < input.size(); }
 
   uint8_t getInt8();
   uint16_t getInt16();
@@ -970,7 +980,6 @@ public:
   int64_t getS64LEB();
   Type getType();
   Type getConcreteType();
-  Name getString();
   Name getInlineString();
   void verifyInt8(int8_t x);
   void verifyInt16(int16_t x);
@@ -1099,7 +1108,7 @@ public:
   bool maybeVisitAtomicRMW(Expression*& out, uint8_t code);
   bool maybeVisitAtomicCmpxchg(Expression*& out, uint8_t code);
   bool maybeVisitAtomicWait(Expression*& out, uint8_t code);
-  bool maybeVisitAtomicWake(Expression*& out, uint8_t code);
+  bool maybeVisitAtomicNotify(Expression*& out, uint8_t code);
   bool maybeVisitConst(Expression*& out, uint8_t code);
   bool maybeVisitUnary(Expression*& out, uint8_t code);
   bool maybeVisitBinary(Expression*& out, uint8_t code);
@@ -1114,6 +1123,10 @@ public:
   bool maybeVisitSIMDShuffle(Expression*& out, uint32_t code);
   bool maybeVisitSIMDBitselect(Expression*& out, uint32_t code);
   bool maybeVisitSIMDShift(Expression*& out, uint32_t code);
+  bool maybeVisitMemoryInit(Expression*& out, uint32_t code);
+  bool maybeVisitDataDrop(Expression*& out, uint32_t code);
+  bool maybeVisitMemoryCopy(Expression*& out, uint32_t code);
+  bool maybeVisitMemoryFill(Expression*& out, uint32_t code);
   void visitSelect(Select* curr);
   void visitReturn(Return* curr);
   bool maybeVisitHost(Expression*& out, uint8_t code);

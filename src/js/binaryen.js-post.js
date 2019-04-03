@@ -67,12 +67,16 @@ Module['UnreachableId'] = Module['_BinaryenUnreachableId']();
 Module['AtomicCmpxchgId'] = Module['_BinaryenAtomicCmpxchgId']();
 Module['AtomicRMWId'] = Module['_BinaryenAtomicRMWId']();
 Module['AtomicWaitId'] = Module['_BinaryenAtomicWaitId']();
-Module['AtomicWakeId'] = Module['_BinaryenAtomicWakeId']();
+Module['AtomicNotifyId'] = Module['_BinaryenAtomicNotifyId']();
 Module['SIMDExtractId'] = Module['_BinaryenSIMDExtractId']();
 Module['SIMDReplaceId'] = Module['_BinaryenSIMDReplaceId']();
 Module['SIMDShuffleId'] = Module['_BinaryenSIMDShuffleId']();
 Module['SIMDBitselectId'] = Module['_BinaryenSIMDBitselectId']();
 Module['SIMDShiftId'] = Module['_BinaryenSIMDShiftId']();
+Module['MemoryInitId'] = Module['_BinaryenMemoryInitId']();
+Module['DataDropId'] = Module['_BinaryenDataDropId']();
+Module['MemoryCopyId'] = Module['_BinaryenMemoryCopyId']();
+Module['MemoryFillId'] = Module['_BinaryenMemoryFillId']();
 
 // External kinds
 Module['ExternalFunction'] = Module['_BinaryenExternalFunction']();
@@ -361,6 +365,13 @@ Module['ConvertUVecI32x4ToVecF32x4'] = Module['_BinaryenConvertUVecI32x4ToVecF32
 Module['ConvertSVecI64x2ToVecF64x2'] = Module['_BinaryenConvertSVecI64x2ToVecF64x2']();
 Module['ConvertUVecI64x2ToVecF64x2'] = Module['_BinaryenConvertUVecI64x2ToVecF64x2']();
 
+// The size of a single literal in memory as used in Const creation,
+// which is a little different: we don't want users to need to make
+// their own Literals, as the C API handles them by value, which means
+// we would leak them. Instead, Const creation is fused together with
+// an intermediate stack allocation of this size to pass the value.
+var sizeOfLiteral = _BinaryenSizeofLiteral();
+
 // 'Module' interface
 Module['Module'] = function(module) {
   assert(!module); // guard against incorrect old API usage
@@ -460,12 +471,23 @@ function wrapModule(module, self) {
     return Module['_BinaryenHost'](module, Module['GrowMemory'], null, i32sToStack([value]), 1);
   }
 
-  // The Const creation API is a little different: we don't want users to
-  // need to make their own Literals, as the C API handles them by value,
-  // which means we would leak them. Instead, this is the only API that
-  // accepts Literals, so fuse it with Literal creation
-  var temp = _malloc(16); // a single literal in memory. the LLVM C ABI
-                          // makes us pass pointers to this.
+  self['memory'] = {
+    'init': function(segment, dest, offset, size) {
+      return Module['_BinaryenMemoryInit'](module, segment, dest, offset, size);
+    },
+    'copy': function(dest, source, size) {
+      return Module['_BinaryenMemoryCopy'](module, dest, source, size);
+    },
+    'fill': function(dest, value, size) {
+      return Module['_BinaryenMemoryFill'](module, dest, value, size);
+    }
+  }
+
+  self['data'] = {
+    'drop': function(segment) {
+      return Module['_BinaryenDataDrop'](module, segment);
+    }
+  }
 
   self['i32'] = {
     'load': function(offset, align, ptr) {
@@ -493,8 +515,11 @@ function wrapModule(module, self) {
       return Module['_BinaryenStore'](module, 2, offset, align, ptr, value, Module['i32']);
     },
     'const': function(x) {
-      Module['_BinaryenLiteralInt32'](temp, x);
-      return Module['_BinaryenConst'](module, temp);
+      return preserveStack(function() {
+        var tempLiteral = stackAlloc(sizeOfLiteral);
+        Module['_BinaryenLiteralInt32'](tempLiteral, x);
+        return Module['_BinaryenConst'](module, tempLiteral);
+      });
     },
     'clz': function(value) {
       return Module['_BinaryenUnary'](module, Module['ClzInt32'], value);
@@ -756,8 +781,11 @@ function wrapModule(module, self) {
       return Module['_BinaryenStore'](module, 4, offset, align, ptr, value, Module['i64']);
     },
     'const': function(x, y) {
-      Module['_BinaryenLiteralInt64'](temp, x, y);
-      return Module['_BinaryenConst'](module, temp);
+      return preserveStack(function() {
+        var tempLiteral = stackAlloc(sizeOfLiteral);
+        Module['_BinaryenLiteralInt64'](tempLiteral, x, y);
+        return Module['_BinaryenConst'](module, tempLiteral);
+      });
     },
     'clz': function(value) {
       return Module['_BinaryenUnary'](module, Module['ClzInt64'], value);
@@ -1027,12 +1055,18 @@ function wrapModule(module, self) {
       return Module['_BinaryenStore'](module, 4, offset, align, ptr, value, Module['f32']);
     },
     'const': function(x) {
-      Module['_BinaryenLiteralFloat32'](temp, x);
-      return Module['_BinaryenConst'](module, temp);
+      return preserveStack(function() {
+        var tempLiteral = stackAlloc(sizeOfLiteral);
+        Module['_BinaryenLiteralFloat32'](tempLiteral, x);
+        return Module['_BinaryenConst'](module, tempLiteral);
+      });
     },
     'const_bits': function(x) {
-      Module['_BinaryenLiteralFloat32Bits'](temp, x);
-      return Module['_BinaryenConst'](module, temp);
+      return preserveStack(function() {
+        var tempLiteral = stackAlloc(sizeOfLiteral);
+        Module['_BinaryenLiteralFloat32Bits'](tempLiteral, x);
+        return Module['_BinaryenConst'](module, tempLiteral);
+      });
     },
     'neg': function(value) {
       return Module['_BinaryenUnary'](module, Module['NegFloat32'], value);
@@ -1126,12 +1160,18 @@ function wrapModule(module, self) {
       return Module['_BinaryenStore'](module, 8, offset, align, ptr, value, Module['f64']);
     },
     'const': function(x) {
-      Module['_BinaryenLiteralFloat64'](temp, x);
-      return Module['_BinaryenConst'](module, temp);
+      return preserveStack(function() {
+        var tempLiteral = stackAlloc(sizeOfLiteral);
+        Module['_BinaryenLiteralFloat64'](tempLiteral, x);
+        return Module['_BinaryenConst'](module, tempLiteral);
+      });
     },
     'const_bits': function(x, y) {
-      Module['_BinaryenLiteralFloat64Bits'](temp, x, y);
-      return Module['_BinaryenConst'](module, temp);
+      return preserveStack(function() {
+        var tempLiteral = stackAlloc(sizeOfLiteral);
+        Module['_BinaryenLiteralFloat64Bits'](tempLiteral, x, y);
+        return Module['_BinaryenConst'](module, tempLiteral);
+      });
     },
     'neg': function(value) {
       return Module['_BinaryenUnary'](module, Module['NegFloat64'], value);
@@ -1226,8 +1266,9 @@ function wrapModule(module, self) {
     },
     'const': function(i8s) {
       return preserveStack(function() {
-        Module['_BinaryenLiteralVec128'](temp, i8sToStack(i8s));
-        return Module['_BinaryenConst'](module, temp);
+        var tempLiteral = stackAlloc(sizeOfLiteral);
+        Module['_BinaryenLiteralVec128'](tempLiteral, i8sToStack(i8s));
+        return Module['_BinaryenConst'](module, tempLiteral);
       });
     },
     'not': function(value) {
@@ -1687,8 +1728,8 @@ function wrapModule(module, self) {
   self['unreachable'] = function() {
     return Module['_BinaryenUnreachable'](module);
   };
-  self['wake'] = function(ptr, wakeCount) {
-    return Module['_BinaryenAtomicWake'](module, ptr, wakeCount);
+  self['notify'] = function(ptr, notifyCount) {
+    return Module['_BinaryenAtomicNotify'](module, ptr, notifyCount);
   };
 
   // 'Module' operations
@@ -1707,7 +1748,7 @@ function wrapModule(module, self) {
     });
   };
   self['removeFunctionType'] = function(name) {
-    return preserveStack(function () {
+    return preserveStack(function() {
       return Module['_BinaryenRemoveFunctionType'](module, strToStack(name));
     });
   };
@@ -1732,7 +1773,7 @@ function wrapModule(module, self) {
     });
   }
   self['removeGlobal'] = function(name) {
-    return preserveStack(function () {
+    return preserveStack(function() {
       return Module['_BinaryenRemoveGlobal'](module, strToStack(name));
     });
   }
@@ -1878,16 +1919,17 @@ function wrapModule(module, self) {
   };
   self['emitBinary'] = function(sourceMapUrl) {
     return preserveStack(function() {
-      Module['_BinaryenModuleAllocateAndWrite'](temp, module, strToStack(sourceMapUrl));
-      var binaryPtr    = HEAPU32[ temp >>> 2     ];
-      var binaryBytes  = HEAPU32[(temp >>> 2) + 1];
-      var sourceMapPtr = HEAPU32[(temp >>> 2) + 2];
+      var tempBuffer = stackAlloc(_BinaryenSizeofAllocateAndWriteResult());
+      Module['_BinaryenModuleAllocateAndWrite'](tempBuffer, module, strToStack(sourceMapUrl));
+      var binaryPtr    = HEAPU32[ tempBuffer >>> 2     ];
+      var binaryBytes  = HEAPU32[(tempBuffer >>> 2) + 1];
+      var sourceMapPtr = HEAPU32[(tempBuffer >>> 2) + 2];
       try {
         var buffer = new Uint8Array(binaryBytes);
         buffer.set(HEAPU8.subarray(binaryPtr, binaryPtr + binaryBytes));
         return typeof sourceMapUrl === 'undefined'
           ? buffer
-          : { 'binary': buffer, 'sourceMap': Pointer_stringify(sourceMapPtr) };
+          : { 'binary': buffer, 'sourceMap': UTF8ToString(sourceMapPtr) };
       } finally {
         _free(binaryPtr);
         if (sourceMapPtr) _free(sourceMapPtr);
@@ -1903,7 +1945,7 @@ function wrapModule(module, self) {
     });
   };
   self['getDebugInfoFileName'] = function(index) {
-    return Pointer_stringify(Module['_BinaryenModuleGetDebugInfoFileName'](module, index));
+    return UTF8ToString(Module['_BinaryenModuleGetDebugInfoFileName'](module, index));
   };
   self['setDebugLocation'] = function(func, expr, fileIndex, lineNumber, columnNumber) {
     return Module['_BinaryenFunctionSetDebugLocation'](func, expr, fileIndex, lineNumber, columnNumber);
@@ -1964,7 +2006,7 @@ Module['getExpressionInfo'] = function(expr) {
       return {
         'id': id,
         'type': type,
-        'name': Pointer_stringify(Module['_BinaryenBlockGetName'](expr)),
+        'name': UTF8ToString(Module['_BinaryenBlockGetName'](expr)),
         'children': getAllNested(expr, Module['_BinaryenBlockGetNumChildren'], Module['_BinaryenBlockGetChild'])
       };
     case Module['IfId']:
@@ -1979,14 +2021,14 @@ Module['getExpressionInfo'] = function(expr) {
       return {
         'id': id,
         'type': type,
-        'name': Pointer_stringify(Module['_BinaryenLoopGetName'](expr)),
+        'name': UTF8ToString(Module['_BinaryenLoopGetName'](expr)),
         'body': Module['_BinaryenLoopGetBody'](expr)
       };
     case Module['BreakId']:
       return {
         'id': id,
         'type': type,
-        'name': Pointer_stringify(Module['_BinaryenBreakGetName'](expr)),
+        'name': UTF8ToString(Module['_BinaryenBreakGetName'](expr)),
         'condition': Module['_BinaryenBreakGetCondition'](expr),
         'value': Module['_BinaryenBreakGetValue'](expr)
       };
@@ -1995,7 +2037,7 @@ Module['getExpressionInfo'] = function(expr) {
         'id': id,
         'type': type,
         'names': getAllNested(expr, Module['_BinaryenSwitchGetNumNames'], Module['_BinaryenSwitchGetName']).map(Pointer_stringify),
-        'defaultName': Pointer_stringify(Module['_BinaryenSwitchGetDefaultName'](expr)),
+        'defaultName': UTF8ToString(Module['_BinaryenSwitchGetDefaultName'](expr)),
         'condition': Module['_BinaryenSwitchGetCondition'](expr),
         'value': Module['_BinaryenSwitchGetValue'](expr)
       };
@@ -2003,7 +2045,7 @@ Module['getExpressionInfo'] = function(expr) {
       return {
         'id': id,
         'type': type,
-        'target': Pointer_stringify(Module['_BinaryenCallGetTarget'](expr)),
+        'target': UTF8ToString(Module['_BinaryenCallGetTarget'](expr)),
         'operands': getAllNested(expr, Module[ '_BinaryenCallGetNumOperands'], Module['_BinaryenCallGetOperand'])
       };
     case Module['CallIndirectId']:
@@ -2031,13 +2073,13 @@ Module['getExpressionInfo'] = function(expr) {
       return {
         'id': id,
         'type': type,
-        'name': Pointer_stringify(Module['_BinaryenGetGlobalGetName'](expr))
+        'name': UTF8ToString(Module['_BinaryenGetGlobalGetName'](expr))
       };
     case Module['SetGlobalId']:
       return {
         'id': id,
         'type': type,
-        'name': Pointer_stringify(Module['_BinaryenSetGlobalGetName'](expr)),
+        'name': UTF8ToString(Module['_BinaryenSetGlobalGetName'](expr)),
         'value': Module['_BinaryenSetGlobalGetValue'](expr)
       };
     case Module['LoadId']:
@@ -2068,7 +2110,18 @@ Module['getExpressionInfo'] = function(expr) {
         case Module['i32']: value = Module['_BinaryenConstGetValueI32'](expr); break;
         case Module['i64']: value = { 'low': Module['_BinaryenConstGetValueI64Low'](expr), 'high': Module['_BinaryenConstGetValueI64High'](expr) }; break;
         case Module['f32']: value = Module['_BinaryenConstGetValueF32'](expr); break;
-        case Module['f64']: value =  Module['_BinaryenConstGetValueF64'](expr); break;
+        case Module['f64']: value = Module['_BinaryenConstGetValueF64'](expr); break;
+        case Module['v128']: {
+          preserveStack(function() {
+            var tempBuffer = stackAlloc(16);
+            Module['_BinaryenConstGetValueV128'](expr, tempBuffer);
+            value = new Array(16);
+            for (var i = 0 ; i < 16; i++) {
+              value[i] = HEAPU8[tempBuffer + i];
+            }
+          });
+          break;
+        }
         default: throw Error('unexpected type: ' + type);
       }
       return {
@@ -2123,7 +2176,7 @@ Module['getExpressionInfo'] = function(expr) {
         'id': id,
         'type': type,
         'op': Module['_BinaryenHostGetOp'](expr),
-        'nameOperand': Pointer_stringify(Module['_BinaryenHostGetNameOperand'](expr)),
+        'nameOperand': UTF8ToString(Module['_BinaryenHostGetNameOperand'](expr)),
         'operands': getAllNested(expr, Module['_BinaryenHostGetNumOperands'], Module['_BinaryenHostGetOperand'])
       };
     case Module['AtomicRMWId']:
@@ -2155,12 +2208,12 @@ Module['getExpressionInfo'] = function(expr) {
         'timeout': Module['_BinaryenAtomicWaitGetTimeout'](expr),
         'expectedType': Module['_BinaryenAtomicWaitGetExpectedType'](expr)
       };
-    case Module['AtomicWakeId']:
+    case Module['AtomicNotifyId']:
       return {
         'id': id,
         'type': type,
-        'ptr': Module['_BinaryenAtomicWakeGetPtr'](expr),
-        'wakeCount': Module['_BinaryenAtomicWakeGetWakeCount'](expr)
+        'ptr': Module['_BinaryenAtomicNotifyGetPtr'](expr),
+        'notifyCount': Module['_BinaryenAtomicNotifyGetNotifyCount'](expr)
       };
     case Module['SIMDExtractId']:
       return {
@@ -2181,11 +2234,11 @@ Module['getExpressionInfo'] = function(expr) {
       };
     case Module['SIMDShuffleId']:
       return preserveStack(function() {
-        var ret = stackAlloc(16);
-        Module['_BinaryenSIMDShuffleGetMask'](expr, ret);
-        var mask = [];
+        var tempBuffer = stackAlloc(16);
+        Module['_BinaryenSIMDShuffleGetMask'](expr, tempBuffer);
+        var mask = new Array(16);
         for (var i = 0 ; i < 16; i++) {
-          mask[i] = HEAP8[ret + i];
+          mask[i] = HEAPU8[tempBuffer + i];
         }
         return {
           'id': id,
@@ -2211,6 +2264,34 @@ Module['getExpressionInfo'] = function(expr) {
         'vec': Module['_BinaryenSIMDShiftGetVec'](expr),
         'shift': Module['_BinaryenSIMDShiftGetShift'](expr)
       };
+    case Module['MemoryInitId']:
+      return {
+        'id': id,
+        'segment': Module['_BinaryenMemoryInitGetSegment'](expr),
+        'dest': Module['_BinaryenMemoryInitGetDest'](expr),
+        'offset': Module['_BinaryenMemoryInitGetOffset'](expr),
+        'size': Module['_BinaryenMemoryInitGetSize'](expr)
+      };
+    case Module['DataDropId']:
+      return {
+        'id': id,
+        'segment': Module['_BinaryenDataDropGetSegment'](expr),
+      };
+    case Module['MemoryCopyId']:
+      return {
+        'id': id,
+        'dest': Module['_BinaryenMemoryCopyGetDest'](expr),
+        'source': Module['_BinaryenMemoryCopyGetSource'](expr),
+        'size': Module['_BinaryenMemoryCopyGetSize'](expr)
+      };
+    case Module['MemoryFillId']:
+      return {
+        'id': id,
+        'dest': Module['_BinaryenMemoryFillGetDest'](expr),
+        'value': Module['_BinaryenMemoryFillGetValue'](expr),
+        'size': Module['_BinaryenMemoryFillGetSize'](expr)
+      };
+
     default:
       throw Error('unexpected id: ' + id);
   }
@@ -2219,7 +2300,7 @@ Module['getExpressionInfo'] = function(expr) {
 // Obtains information about a 'FunctionType'
 Module['getFunctionTypeInfo'] = function(func) {
   return {
-    'name': Pointer_stringify(Module['_BinaryenFunctionTypeGetName'](func)),
+    'name': UTF8ToString(Module['_BinaryenFunctionTypeGetName'](func)),
     'params': getAllNested(func, Module['_BinaryenFunctionTypeGetNumParams'], Module['_BinaryenFunctionTypeGetParam']),
     'result': Module['_BinaryenFunctionTypeGetResult'](func)
   };
@@ -2228,10 +2309,10 @@ Module['getFunctionTypeInfo'] = function(func) {
 // Obtains information about a 'Function'
 Module['getFunctionInfo'] = function(func) {
   return {
-    'name': Pointer_stringify(Module['_BinaryenFunctionGetName'](func)),
-    'module': Pointer_stringify(Module['_BinaryenFunctionImportGetModule'](func)),
-    'base': Pointer_stringify(Module['_BinaryenFunctionImportGetBase'](func)),
-    'type': Pointer_stringify(Module['_BinaryenFunctionGetType'](func)),
+    'name': UTF8ToString(Module['_BinaryenFunctionGetName'](func)),
+    'module': UTF8ToString(Module['_BinaryenFunctionImportGetModule'](func)),
+    'base': UTF8ToString(Module['_BinaryenFunctionImportGetBase'](func)),
+    'type': UTF8ToString(Module['_BinaryenFunctionGetType'](func)),
     'params': getAllNested(func, Module['_BinaryenFunctionGetNumParams'], Module['_BinaryenFunctionGetParam']),
     'result': Module['_BinaryenFunctionGetResult'](func),
     'vars': getAllNested(func, Module['_BinaryenFunctionGetNumVars'], Module['_BinaryenFunctionGetVar']),
@@ -2242,10 +2323,10 @@ Module['getFunctionInfo'] = function(func) {
 // Obtains information about a 'Global'
 Module['getGlobalInfo'] = function(func) {
   return {
-    'name': Pointer_stringify(Module['_BinaryenGlobalGetName'](func)),
-    'module': Pointer_stringify(Module['_BinaryenGlobalImportGetModule'](func)),
-    'base': Pointer_stringify(Module['_BinaryenGlobalImportGetBase'](func)),
-    'type': Pointer_stringify(Module['_BinaryenGlobalGetType'](func))
+    'name': UTF8ToString(Module['_BinaryenGlobalGetName'](func)),
+    'module': UTF8ToString(Module['_BinaryenGlobalImportGetModule'](func)),
+    'base': UTF8ToString(Module['_BinaryenGlobalImportGetBase'](func)),
+    'type': UTF8ToString(Module['_BinaryenGlobalGetType'](func))
   };
 };
 
@@ -2253,8 +2334,8 @@ Module['getGlobalInfo'] = function(func) {
 Module['getExportInfo'] = function(export_) {
   return {
     'kind': Module['_BinaryenExportGetKind'](export_),
-    'name': Pointer_stringify(Module['_BinaryenExportGetName'](export_)),
-    'value': Pointer_stringify(Module['_BinaryenExportGetValue'](export_))
+    'name': UTF8ToString(Module['_BinaryenExportGetName'](export_)),
+    'value': UTF8ToString(Module['_BinaryenExportGetValue'](export_))
   };
 };
 

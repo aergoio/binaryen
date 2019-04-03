@@ -727,6 +727,10 @@ public:
   Flow visitLoad(Load *curr) { WASM_UNREACHABLE(); }
   Flow visitStore(Store *curr) { WASM_UNREACHABLE(); }
   Flow visitHost(Host *curr) { WASM_UNREACHABLE(); }
+  Flow visitMemoryInit(MemoryInit *curr) { WASM_UNREACHABLE(); }
+  Flow visitDataDrop(DataDrop *curr) { WASM_UNREACHABLE(); }
+  Flow visitMemoryCopy(MemoryCopy *curr) { WASM_UNREACHABLE(); }
+  Flow visitMemoryFill(MemoryFill *curr) { WASM_UNREACHABLE(); }
 };
 
 //
@@ -1120,12 +1124,12 @@ public:
         //       for now, just assume we are woken up
         return Literal(int32_t(0)); // woken up
       }
-      Flow visitAtomicWake(AtomicWake *curr) {
-        NOTE_ENTER("AtomicWake");
+      Flow visitAtomicNotify(AtomicNotify *curr) {
+        NOTE_ENTER("AtomicNotify");
         Flow ptr = this->visit(curr->ptr);
         if (ptr.breaking()) return ptr;
         NOTE_EVAL1(ptr);
-        auto count = this->visit(curr->wakeCount);
+        auto count = this->visit(curr->notifyCount);
         NOTE_EVAL1(count);
         if (count.breaking()) return count;
         // TODO: add threads support!
@@ -1151,6 +1155,26 @@ public:
           }
         }
         WASM_UNREACHABLE();
+      }
+      Flow visitMemoryInit(MemoryInit *curr) {
+        NOTE_ENTER("MemoryInit");
+        // TODO(tlively): implement me
+        return {};
+      }
+      Flow visitDataDrop(DataDrop *curr) {
+        NOTE_ENTER("DataDrop");
+        // TODO(tlively): implement me
+        return {};
+      }
+      Flow visitMemoryCopy(MemoryCopy *curr) {
+        NOTE_ENTER("MemoryCopy");
+        // TODO(tlively): implement me
+        return {};
+      }
+      Flow visitMemoryFill(MemoryFill *curr) {
+        NOTE_ENTER("MemoryFill");
+        // TODO(tlively): implement me
+        return {};
       }
 
       void trap(const char* why) override {

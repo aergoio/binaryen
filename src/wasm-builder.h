@@ -247,13 +247,13 @@ public:
     wait->finalize();
     return wait;
   }
-  AtomicWake* makeAtomicWake(Expression* ptr, Expression* wakeCount, Address offset) {
-    auto* wake = allocator.alloc<AtomicWake>();
-    wake->offset = offset;
-    wake->ptr = ptr;
-    wake->wakeCount = wakeCount;
-    wake->finalize();
-    return wake;
+  AtomicNotify* makeAtomicNotify(Expression* ptr, Expression* notifyCount, Address offset) {
+    auto* notify = allocator.alloc<AtomicNotify>();
+    notify->offset = offset;
+    notify->ptr = ptr;
+    notify->notifyCount = notifyCount;
+    notify->finalize();
+    return notify;
   }
   Store* makeStore(unsigned bytes, uint32_t offset, unsigned align, Expression *ptr, Expression *value, Type type) {
     auto* ret = allocator.alloc<Store>();
@@ -331,6 +331,37 @@ public:
     ret->op = op;
     ret->vec = vec;
     ret->shift = shift;
+    ret->finalize();
+    return ret;
+  }
+  MemoryInit* makeMemoryInit(uint32_t segment, Expression* dest, Expression* offset, Expression* size) {
+    auto* ret = allocator.alloc<MemoryInit>();
+    ret->segment = segment;
+    ret->dest = dest;
+    ret->offset = offset;
+    ret->size = size;
+    ret->finalize();
+    return ret;
+  }
+  DataDrop* makeDataDrop(uint32_t segment) {
+    auto* ret = allocator.alloc<DataDrop>();
+    ret->segment = segment;
+    ret->finalize();
+    return ret;
+  }
+  MemoryCopy* makeMemoryCopy(Expression* dest, Expression* source, Expression* size) {
+    auto* ret = allocator.alloc<MemoryCopy>();
+    ret->dest = dest;
+    ret->source = source;
+    ret->size = size;
+    ret->finalize();
+    return ret;
+  }
+  MemoryFill* makeMemoryFill(Expression* dest, Expression* value, Expression* size) {
+    auto* ret = allocator.alloc<MemoryFill>();
+    ret->dest = dest;
+    ret->value = value;
+    ret->size = size;
     ret->finalize();
     return ret;
   }

@@ -144,6 +144,17 @@ bool Literal::operator!=(const Literal& other) const {
   return !(*this == other);
 }
 
+bool Literal::isNaN() {
+  if (type == Type::f32 && std::isnan(getf32())) {
+    return true;
+  }
+  if (type == Type::f64 && std::isnan(getf64())) {
+    return true;
+  }
+  // TODO: SIMD?
+  return false;
+}
+
 uint32_t Literal::NaNPayload(float f) {
   assert(std::isnan(f) && "expected a NaN");
   // SEEEEEEE EFFFFFFF FFFFFFFF FFFFFFFF
@@ -212,9 +223,14 @@ void Literal::printDouble(std::ostream& o, double d) {
 
 void Literal::printVec128(std::ostream& o, const std::array<uint8_t, 16>& v) {
   o << std::hex;
-  for (auto i = 0; i < 16; ++i) {
-    o << "0x" << uint32_t(v[i]);
-    if (i < 15) o << " ";
+  for (auto i = 0; i < 16; i += 4) {
+    if (i) o << " ";
+    o << "0x" << std::setfill('0') << std::setw(8) << uint32_t(
+       v[i    ]        |
+      (v[i + 1] <<  8) |
+      (v[i + 2] << 16) |
+      (v[i + 3] << 24)
+    );
   }
   o << std::dec;
 }
@@ -227,7 +243,7 @@ std::ostream& operator<<(std::ostream& o, Literal literal) {
     case Type::i64: o << literal.i64; break;
     case Type::f32: literal.printFloat(o, literal.getf32()); break;
     case Type::f64: literal.printDouble(o, literal.getf64()); break;
-    case Type::v128: o << "i32 "; literal.printVec128(o, literal.getv128()); break;
+    case Type::v128: o << "i32x4 "; literal.printVec128(o, literal.getv128()); break;
     case Type::unreachable: WASM_UNREACHABLE();
   }
   restoreNormalColor(o);

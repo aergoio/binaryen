@@ -31,10 +31,13 @@ const char* Name = "name";
 const char* SourceMapUrl = "sourceMappingURL";
 const char* Dylink = "dylink";
 const char* Linking = "linking";
+const char* Producers = "producers";
+const char* TargetFeatures = "target_features";
 }
 }
 
 Name GROW_WASM_MEMORY("__growWasmMemory"),
+     WASM_CALL_CTORS("__wasm_call_ctors"),
      MEMORY_BASE("__memory_base"),
      TABLE_BASE("__table_base"),
      GET_TEMP_RET0("getTempRet0"),
@@ -103,12 +106,16 @@ const char* getExpressionName(Expression* curr) {
     case Expression::Id::AtomicCmpxchgId: return "atomic_cmpxchg";
     case Expression::Id::AtomicRMWId: return "atomic_rmw";
     case Expression::Id::AtomicWaitId: return "atomic_wait";
-    case Expression::Id::AtomicWakeId: return "atomic_wake";
+    case Expression::Id::AtomicNotifyId: return "atomic_notify";
     case Expression::Id::SIMDExtractId: return "simd_extract";
     case Expression::Id::SIMDReplaceId: return "simd_replace";
     case Expression::Id::SIMDShuffleId: return "simd_shuffle";
     case Expression::Id::SIMDBitselectId: return "simd_bitselect";
     case Expression::Id::SIMDShiftId: return "simd_shift";
+    case Expression::Id::MemoryInitId: return "memory_init";
+    case Expression::Id::DataDropId: return "data_drop";
+    case Expression::Id::MemoryCopyId: return "memory_copy";
+    case Expression::Id::MemoryFillId: return "memory_fill";
     case Expression::Id::NumExpressionIds: WASM_UNREACHABLE();
   }
   WASM_UNREACHABLE();
@@ -414,9 +421,9 @@ void AtomicWait::finalize() {
   }
 }
 
-void AtomicWake::finalize() {
+void AtomicNotify::finalize() {
   type = i32;
-  if (ptr->type == unreachable || wakeCount->type == unreachable) {
+  if (ptr->type == unreachable || notifyCount->type == unreachable) {
     type = unreachable;
   }
 }
@@ -459,6 +466,34 @@ void SIMDBitselect::finalize() {
   assert(left && right && cond);
   type = v128;
   if (left->type == unreachable || right->type == unreachable || cond->type == unreachable) {
+    type = unreachable;
+  }
+}
+
+void MemoryInit::finalize() {
+  assert(dest && offset && size);
+  type = none;
+  if (dest->type == unreachable || offset->type == unreachable || size->type == unreachable) {
+    type = unreachable;
+  }
+}
+
+void DataDrop::finalize() {
+  type = none;
+}
+
+void MemoryCopy::finalize() {
+  assert(dest && source && size);
+  type = none;
+  if (dest->type == unreachable || source->type == unreachable || size->type == unreachable) {
+    type = unreachable;
+  }
+}
+
+void MemoryFill::finalize() {
+  assert(dest && value && size);
+  type = none;
+  if (dest->type == unreachable || value->type == unreachable || size->type == unreachable) {
     type = unreachable;
   }
 }
@@ -833,6 +868,7 @@ void Module::addExport(Export* curr) {
   exportsMap[curr->name] = curr;
 }
 
+// TODO(@warchant): refactor all usages to use variant with unique_ptr
 void Module::addFunction(Function* curr) {
   if (!curr->name.is()) {
     Fatal() << "Module::addFunction: empty name";
@@ -842,6 +878,17 @@ void Module::addFunction(Function* curr) {
   }
   functions.push_back(std::unique_ptr<Function>(curr));
   functionsMap[curr->name] = curr;
+}
+
+void Module::addFunction(std::unique_ptr<Function> curr) {
+  if (!curr->name.is()) {
+    Fatal() << "Module::addFunction: empty name";
+  }
+  if (getFunctionOrNull(curr->name)) {
+    Fatal() << "Module::addFunction: " << curr->name << " already exists";
+  }
+  functionsMap[curr->name] = curr.get();
+  functions.push_back(std::move(curr));
 }
 
 void Module::addGlobal(Global* curr) {

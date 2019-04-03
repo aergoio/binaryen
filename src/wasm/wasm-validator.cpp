@@ -235,6 +235,7 @@ public:
   void visitSwitch(Switch* curr);
   void visitCall(Call* curr);
   void visitCallIndirect(CallIndirect* curr);
+  void visitConst(Const* curr);
   void visitGetLocal(GetLocal* curr);
   void visitSetLocal(SetLocal* curr);
   void visitGetGlobal(GetGlobal* curr);
@@ -244,12 +245,16 @@ public:
   void visitAtomicRMW(AtomicRMW* curr);
   void visitAtomicCmpxchg(AtomicCmpxchg* curr);
   void visitAtomicWait(AtomicWait* curr);
-  void visitAtomicWake(AtomicWake* curr);
+  void visitAtomicNotify(AtomicNotify* curr);
   void visitSIMDExtract(SIMDExtract* curr);
   void visitSIMDReplace(SIMDReplace* curr);
   void visitSIMDShuffle(SIMDShuffle* curr);
   void visitSIMDBitselect(SIMDBitselect* curr);
   void visitSIMDShift(SIMDShift* curr);
+  void visitMemoryInit(MemoryInit* curr);
+  void visitDataDrop(DataDrop* curr);
+  void visitMemoryCopy(MemoryCopy* curr);
+  void visitMemoryFill(MemoryFill* curr);
   void visitBinary(Binary* curr);
   void visitUnary(Unary* curr);
   void visitSelect(Select* curr);
@@ -471,6 +476,11 @@ void FunctionValidator::visitCallIndirect(CallIndirect* curr) {
   }
 }
 
+void FunctionValidator::visitConst(Const* curr) {
+  shouldBeTrue(getFeatures(curr->type) <= info.features, curr,
+               "all used features should be allowed");
+}
+
 void FunctionValidator::visitGetLocal(GetLocal* curr) {
   shouldBeTrue(curr->index < getFunction()->getNumLocals(), curr, "local.get index must be small enough");
   shouldBeTrue(isConcreteType(curr->type), curr, "local.get must have a valid type - check what you provided when you constructed the node");
@@ -566,12 +576,12 @@ void FunctionValidator::visitAtomicWait(AtomicWait* curr) {
   shouldBeEqualOrFirstIsUnreachable(curr->timeout->type, i64, curr, "AtomicWait timeout type must be i64");
 }
 
-void FunctionValidator::visitAtomicWake(AtomicWake* curr) {
+void FunctionValidator::visitAtomicNotify(AtomicNotify* curr) {
   shouldBeTrue(info.features.hasAtomics(), curr, "Atomic operation (atomics are disabled)");
   shouldBeFalse(!getModule()->memory.shared, curr, "Atomic operation with non-shared memory");
-  shouldBeEqualOrFirstIsUnreachable(curr->type, i32, curr, "AtomicWake must have type i32");
-  shouldBeEqualOrFirstIsUnreachable(curr->ptr->type, i32, curr, "AtomicWake pointer type must be i32");
-  shouldBeEqualOrFirstIsUnreachable(curr->wakeCount->type, i32, curr, "AtomicWake wakeCount type must be i32");
+  shouldBeEqualOrFirstIsUnreachable(curr->type, i32, curr, "AtomicNotify must have type i32");
+  shouldBeEqualOrFirstIsUnreachable(curr->ptr->type, i32, curr, "AtomicNotify pointer type must be i32");
+  shouldBeEqualOrFirstIsUnreachable(curr->notifyCount->type, i32, curr, "AtomicNotify notifyCount type must be i32");
 }
 
 void FunctionValidator::visitSIMDExtract(SIMDExtract* curr) {
@@ -634,6 +644,37 @@ void FunctionValidator::visitSIMDShift(SIMDShift* curr) {
   shouldBeEqualOrFirstIsUnreachable(curr->type, v128, curr, "vector shift must have type v128");
   shouldBeEqualOrFirstIsUnreachable(curr->vec->type, v128, curr, "expected operand of type v128");
   shouldBeEqualOrFirstIsUnreachable(curr->shift->type, i32, curr, "expected shift amount to have type i32");
+}
+
+void FunctionValidator::visitMemoryInit(MemoryInit* curr) {
+  shouldBeTrue(info.features.hasBulkMemory(), curr, "Bulk memory operation (bulk memory is disabled)");
+  shouldBeEqualOrFirstIsUnreachable(curr->type, none, curr, "memory.init must have type none");
+  shouldBeEqualOrFirstIsUnreachable(curr->dest->type, i32, curr, "memory.init dest must be an i32");
+  shouldBeEqualOrFirstIsUnreachable(curr->offset->type, i32, curr, "memory.init offset must be an i32");
+  shouldBeEqualOrFirstIsUnreachable(curr->size->type, i32, curr, "memory.init size must be an i32");
+  shouldBeTrue(curr->segment < getModule()->memory.segments.size(), curr, "memory.init segment index out of bounds");
+}
+
+void FunctionValidator::visitDataDrop(DataDrop* curr) {
+  shouldBeTrue(info.features.hasBulkMemory(), curr, "Bulk memory operation (bulk memory is disabled)");
+  shouldBeEqualOrFirstIsUnreachable(curr->type, none, curr, "data.drop must have type none");
+  shouldBeTrue(curr->segment < getModule()->memory.segments.size(), curr, "data.drop segment index out of bounds");
+}
+
+void FunctionValidator::visitMemoryCopy(MemoryCopy* curr) {
+  shouldBeTrue(info.features.hasBulkMemory(), curr, "Bulk memory operation (bulk memory is disabled)");
+  shouldBeEqualOrFirstIsUnreachable(curr->type, none, curr, "memory.copy must have type none");
+  shouldBeEqualOrFirstIsUnreachable(curr->dest->type, i32, curr, "memory.copy dest must be an i32");
+  shouldBeEqualOrFirstIsUnreachable(curr->source->type, i32, curr, "memory.copy source must be an i32");
+  shouldBeEqualOrFirstIsUnreachable(curr->size->type, i32, curr, "memory.copy size must be an i32");
+}
+
+void FunctionValidator::visitMemoryFill(MemoryFill* curr) {
+  shouldBeTrue(info.features.hasBulkMemory(), curr, "Bulk memory operation (bulk memory is disabled)");
+  shouldBeEqualOrFirstIsUnreachable(curr->type, none, curr, "memory.fill must have type none");
+  shouldBeEqualOrFirstIsUnreachable(curr->dest->type, i32, curr, "memory.fill dest must be an i32");
+  shouldBeEqualOrFirstIsUnreachable(curr->value->type, i32, curr, "memory.fill value must be an i32");
+  shouldBeEqualOrFirstIsUnreachable(curr->size->type, i32, curr, "memory.fill size must be an i32");
 }
 
 void FunctionValidator::validateMemBytes(uint8_t bytes, Type type, Expression* curr) {
@@ -1046,12 +1087,17 @@ void FunctionValidator::visitHost(Host* curr) {
 }
 
 void FunctionValidator::visitFunction(Function* curr) {
+  FeatureSet typeFeatures = getFeatures(curr->result);
   for (auto type : curr->params) {
+    typeFeatures |= getFeatures(type);
     shouldBeTrue(isConcreteType(type), curr, "params must be concretely typed");
   }
   for (auto type : curr->vars) {
+    typeFeatures |= getFeatures(type);
     shouldBeTrue(isConcreteType(type), curr, "vars must be concretely typed");
   }
+  shouldBeTrue(typeFeatures <= info.features, curr,
+               "all used types should be allowed");
   // if function has no result, it is ignored
   // if body is unreachable, it might be e.g. a return
   if (curr->body->type != unreachable) {
@@ -1230,6 +1276,8 @@ static void validateExports(Module& module, ValidationInfo& info) {
 
 static void validateGlobals(Module& module, ValidationInfo& info) {
   ModuleUtils::iterDefinedGlobals(module, [&](Global* curr) {
+    info.shouldBeTrue(getFeatures(curr->type) <= info.features, curr->name,
+                      "all used types should be allowed");
     info.shouldBeTrue(curr->init != nullptr, curr->name, "global init must be non-null");
     info.shouldBeTrue(curr->init->is<Const>() || curr->init->is<GetGlobal>(), curr->name, "global init must be valid");
     if (!info.shouldBeEqual(curr->type, curr->init->type, curr->init, "global init must have correct type") && !info.quiet) {

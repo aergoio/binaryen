@@ -35,45 +35,9 @@
 #include "mixed_arena.h"
 #include "support/name.h"
 #include "wasm-type.h"
+#include "wasm-features.h"
 
 namespace wasm {
-
-struct FeatureSet {
-  enum Feature : uint32_t {
-    MVP = 0,
-    Atomics = 1 << 0,
-    MutableGlobals = 1 << 1,
-    TruncSat = 1 << 2,
-    SIMD = 1 << 3,
-    All = Atomics | MutableGlobals | TruncSat | SIMD
-  };
-
-  FeatureSet() : features(MVP) {}
-  FeatureSet(uint32_t features) : features(features) {}
-
-  bool isMVP() const { return features == MVP; }
-  bool has(Feature f) { return (features & f) == f; }
-  bool hasAtomics() const { return features & Atomics; }
-  bool hasMutableGlobals() const { return features & MutableGlobals; }
-  bool hasTruncSat() const { return features & TruncSat; }
-  bool hasSIMD() const { return features & SIMD; }
-  bool hasAll() const { return features & All; }
-
-  void makeMVP() { features = MVP; }
-  void set(Feature f, bool v = true) { features = v ? (features | f) : (features & ~f); }
-  void setAtomics(bool v = true) { set(Atomics, v); }
-  void setMutableGlobals(bool v = true) { set(MutableGlobals, v); }
-  void setTruncSat(bool v = true) { set(TruncSat, v); }
-  void setSIMD(bool v = true) { set(SIMD, v); }
-  void setAll(bool v = true) { features = v ? All : MVP; }
-
-  bool operator<=(const FeatureSet& other) {
-    return !(features & ~other.features);
-  }
-
-private:
-  uint32_t features;
-};
 
 // An index in a wasm module
 typedef uint32_t Index;
@@ -95,12 +59,6 @@ struct Address {
   Address& operator++() { ++addr; return *this; }
 };
 
-// An offset into memory
-typedef int32_t Offset;
-
-// Types
-
-
 // Operators
 
 enum UnaryOp {
@@ -117,7 +75,6 @@ enum UnaryOp {
   PromoteFloat32, // f32 to f64
   DemoteFloat64, // f64 to f32
   ReinterpretInt32, ReinterpretInt64, // reinterpret bits to float
-  // The following sign-extention operators go along with wasm atomics support.
   // Extend signed subword-sized integer. This differs from e.g. ExtendSInt32
   // because the input integer is in an i64 value insetad of an i32 value.
   ExtendS8Int32, ExtendS16Int32, ExtendS8Int64, ExtendS16Int64, ExtendS32Int64,
@@ -249,12 +206,16 @@ public:
     AtomicRMWId,
     AtomicCmpxchgId,
     AtomicWaitId,
-    AtomicWakeId,
+    AtomicNotifyId,
     SIMDExtractId,
     SIMDReplaceId,
     SIMDShuffleId,
     SIMDBitselectId,
     SIMDShiftId,
+    MemoryInitId,
+    DataDropId,
+    MemoryCopyId,
+    MemoryFillId,
     NumExpressionIds
   };
   Id _id;
@@ -267,7 +228,7 @@ public:
   void finalize() {}
 
   template<class T>
-  bool is() {
+  bool is() const {
     return int(_id) == int(T::SpecificId);
   }
 
@@ -276,10 +237,21 @@ public:
     return int(_id) == int(T::SpecificId) ? (T*)this : nullptr;
   }
 
+  template <class T>
+  const T* dynCast() const {
+    return int(_id) == int(T::SpecificId) ? (const T*)this : nullptr;
+  }
+
   template<class T>
   T* cast() {
     assert(int(_id) == int(T::SpecificId));
     return (T*)this;
+  }
+
+  template<class T>
+  const T* cast() const {
+    assert(int(_id) == int(T::SpecificId));
+    return (const T*)this;
   }
 };
 
@@ -540,14 +512,14 @@ class AtomicWait : public SpecificExpression<Expression::AtomicWaitId> {
   void finalize();
 };
 
-class AtomicWake : public SpecificExpression<Expression::AtomicWakeId> {
+class AtomicNotify : public SpecificExpression<Expression::AtomicNotifyId> {
  public:
-  AtomicWake() = default;
-  AtomicWake(MixedArena& allocator) : AtomicWake() {}
+  AtomicNotify() = default;
+  AtomicNotify(MixedArena& allocator) : AtomicNotify() {}
 
   Address offset;
   Expression* ptr;
-  Expression* wakeCount;
+  Expression* notifyCount;
 
   void finalize();
 };
@@ -609,6 +581,53 @@ class SIMDShift : public SpecificExpression<Expression::SIMDShiftId> {
   SIMDShiftOp op;
   Expression* vec;
   Expression* shift;
+
+  void finalize();
+};
+
+class MemoryInit : public SpecificExpression<Expression::MemoryInitId> {
+ public:
+  MemoryInit() = default;
+  MemoryInit(MixedArena& allocator) : MemoryInit() {}
+
+  Index segment;
+  Expression* dest;
+  Expression* offset;
+  Expression* size;
+
+  void finalize();
+};
+
+class DataDrop : public SpecificExpression<Expression::DataDropId> {
+ public:
+  DataDrop() = default;
+  DataDrop(MixedArena& allocator) : DataDrop() {}
+
+  Index segment;
+
+  void finalize();
+};
+
+class MemoryCopy : public SpecificExpression<Expression::MemoryCopyId> {
+ public:
+  MemoryCopy() = default;
+  MemoryCopy(MixedArena& allocator) : MemoryCopy() {}
+
+  Expression* dest;
+  Expression* source;
+  Expression* size;
+
+  void finalize();
+};
+
+class MemoryFill : public SpecificExpression<Expression::MemoryFillId> {
+ public:
+  MemoryFill() = default;
+  MemoryFill(MixedArena& allocator) : MemoryFill() {}
+
+  Expression* dest;
+  Expression* value;
+  Expression* size;
 
   void finalize();
 };
@@ -908,7 +927,7 @@ private:
   std::map<Name, Global*> globalsMap;
 
 public:
-  Module() = default;;
+  Module() = default;
 
   FunctionType* getFunctionType(Name name);
   Export* getExport(Name name);
@@ -923,6 +942,7 @@ public:
   FunctionType* addFunctionType(std::unique_ptr<FunctionType> curr);
   void addExport(Export* curr);
   void addFunction(Function* curr);
+  void addFunction(std::unique_ptr<Function> curr);
   void addGlobal(Global* curr);
 
   void addStart(const Name& s);

@@ -111,8 +111,8 @@ Expression* flexibleCopy(Expression* original, Module& wasm, CustomCopier custom
     Expression* visitAtomicWait(AtomicWait* curr) {
       return builder.makeAtomicWait(copy(curr->ptr), copy(curr->expected), copy(curr->timeout), curr->expectedType, curr->offset);
     }
-    Expression* visitAtomicWake(AtomicWake* curr) {
-      return builder.makeAtomicWake(copy(curr->ptr), copy(curr->wakeCount), curr->offset);
+    Expression* visitAtomicNotify(AtomicNotify* curr) {
+      return builder.makeAtomicNotify(copy(curr->ptr), copy(curr->notifyCount), curr->offset);
     }
     Expression* visitSIMDExtract(SIMDExtract* curr) {
       return builder.makeSIMDExtract(curr->op, copy(curr->vec), curr->index);
@@ -129,8 +129,20 @@ Expression* flexibleCopy(Expression* original, Module& wasm, CustomCopier custom
     Expression* visitSIMDShift(SIMDShift* curr) {
       return builder.makeSIMDShift(curr->op, copy(curr->vec), copy(curr->shift));
     }
-    Expression* visitConst(Const *curr) {
+    Expression* visitConst(Const* curr) {
       return builder.makeConst(curr->value);
+    }
+    Expression* visitMemoryInit(MemoryInit* curr) {
+      return builder.makeMemoryInit(curr->segment, copy(curr->dest), copy(curr->offset), copy(curr->size));
+    }
+    Expression* visitDataDrop(DataDrop* curr) {
+      return builder.makeDataDrop(curr->segment);
+    }
+    Expression* visitMemoryCopy(MemoryCopy* curr) {
+      return builder.makeMemoryCopy(copy(curr->dest), copy(curr->source), copy(curr->size));
+    }
+    Expression* visitMemoryFill(MemoryFill* curr) {
+      return builder.makeMemoryFill(copy(curr->dest), copy(curr->value), copy(curr->size));
     }
     Expression* visitUnary(Unary *curr) {
       return builder.makeUnary(curr->op, copy(curr->value));

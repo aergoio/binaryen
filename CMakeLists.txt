@@ -48,6 +48,14 @@ FUNCTION(ADD_LINK_FLAG value)
   ENDFOREACH(variable)
 ENDFUNCTION()
 
+FUNCTION(ADD_SOURCES)
+  FOREACH(LIB_SOURCE ${ARGV})
+    GET_FILENAME_COMPONENT(LIB_SOURCE_ABSOLUTE ${LIB_SOURCE} ABSOLUTE)
+    LIST(APPEND LIB_SOURCES_ABSOLUTE ${LIB_SOURCE_ABSOLUTE})
+  ENDFOREACH()
+  TARGET_SOURCES(binaryen PRIVATE ${LIB_SOURCES_ABSOLUTE})
+ENDFUNCTION()
+
 # Compiler setup.
 
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -56,7 +64,7 @@ INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/src)
 FOREACH(SUFFIX "_DEBUG" "_RELEASE" "_RELWITHDEBINFO" "_MINSIZEREL" "")
   SET(CMAKE_RUNTIME_OUTPUT_DIRECTORY${SUFFIX} "${PROJECT_BINARY_DIR}/bin")
   SET(CMAKE_LIBRARY_OUTPUT_DIRECTORY${SUFFIX} "${PROJECT_BINARY_DIR}/lib")
-  SET(CMAKE_ARCHIVE_OUTPUT_DIRECTORY${SUFFIX} "${PROJECT_BINARY_DIR}/lib")
+  SET(CMAKE_ARCHIVE_OUTPUT_DIRECTORY${SUFFIX} "${CMAKE_CURRENT_LIST_DIR}/../../lib")
 ENDFOREACH()
 
 IF(MSVC)
@@ -92,6 +100,11 @@ IF(MSVC)
         CMAKE_C_FLAGS_MINSIZEREL)
       string (REGEX REPLACE "(^| )[/-]D *NDEBUG($| )" " "
         "${flags_var_to_scrub}" "${${flags_var_to_scrub}}")
+
+      # Compile with `/MT` to link against `libcmt.lib`, removing a dependency
+      # on `msvcrt.dll`. May result in slightly larger binaries but they should
+      # be more portable across systems.
+      string(REPLACE "/MD" "/MT" ${flags_var_to_scrub} "${${flags_var_to_scrub}}")
     endforeach()
   endif()
 
@@ -144,122 +157,37 @@ IF (UNIX AND
   ADD_COMPILE_FLAG("-fcolor-diagnostics")
 ENDIF()
 
+IF(BUILD_STATIC_LIB)
+  ADD_LIBRARY(binaryen STATIC)
+ELSE()
+  ADD_LIBRARY(binaryen SHARED)
+ENDIF()
+
 # Static libraries
 # Current (partial) dependency structure is as follows:
 # passes -> wasm -> asmjs -> support
 # TODO: It's odd that wasm should depend on asmjs, maybe we should fix that.
-#ADD_SUBDIRECTORY(src/ir)
-#ADD_SUBDIRECTORY(src/asmjs)
-#ADD_SUBDIRECTORY(src/cfg)
-#ADD_SUBDIRECTORY(src/emscripten-optimizer)
-#ADD_SUBDIRECTORY(src/passes)
-#ADD_SUBDIRECTORY(src/support)
-#ADD_SUBDIRECTORY(src/wasm)
+ADD_SUBDIRECTORY(src/ir)
+ADD_SUBDIRECTORY(src/asmjs)
+ADD_SUBDIRECTORY(src/cfg)
+ADD_SUBDIRECTORY(src/emscripten-optimizer)
+ADD_SUBDIRECTORY(src/passes)
+ADD_SUBDIRECTORY(src/support)
+ADD_SUBDIRECTORY(src/wasm)
 
 # Sources.
 
 
 SET(binaryen_SOURCES
   src/binaryen-c.cpp
-  src/passes/pass.cpp
-  src/passes/CoalesceLocals.cpp
-  src/passes/CodePushing.cpp
-  src/passes/CodeFolding.cpp
-  src/passes/ConstHoisting.cpp
-  src/passes/DataFlowOpts.cpp
-  src/passes/DeadArgumentElimination.cpp
-  src/passes/DeadCodeElimination.cpp
-  src/passes/DuplicateFunctionElimination.cpp
-  src/passes/ExtractFunction.cpp
-  src/passes/Flatten.cpp
-  src/passes/FuncCastEmulation.cpp
-  src/passes/I64ToI32Lowering.cpp
-  src/passes/Inlining.cpp
-  src/passes/InstrumentLocals.cpp
-  src/passes/InstrumentMemory.cpp
-  src/passes/LegalizeJSInterface.cpp
-  src/passes/LocalCSE.cpp
-  src/passes/LogExecution.cpp
-  src/passes/LoopInvariantCodeMotion.cpp
-  src/passes/MemoryPacking.cpp
-  src/passes/MergeBlocks.cpp
-  src/passes/MergeLocals.cpp
-  src/passes/Metrics.cpp
-  src/passes/MinifyImportsAndExports.cpp
-  src/passes/NameList.cpp
-  src/passes/NoExitRuntime.cpp
-  src/passes/OptimizeInstructions.cpp
-  src/passes/PickLoadSigns.cpp
-  src/passes/PostEmscripten.cpp
-  src/passes/Precompute.cpp
-  src/passes/Print.cpp
-  src/passes/PrintCallGraph.cpp
-  src/passes/StackIR.cpp
-  src/passes/Strip.cpp
-  src/passes/RedundantSetElimination.cpp
-  src/passes/RelooperJumpThreading.cpp
-  src/passes/ReReloop.cpp
-  src/passes/RemoveImports.cpp
-  src/passes/RemoveMemory.cpp
-  src/passes/RemoveNonJSOps.cpp
-  src/passes/RemoveUnusedBrs.cpp
-  src/passes/RemoveUnusedNames.cpp
-  src/passes/RemoveUnusedModuleElements.cpp
-  src/passes/ReorderLocals.cpp
-  src/passes/ReorderFunctions.cpp
-  src/passes/TrapMode.cpp
-  src/passes/SafeHeap.cpp
-  src/passes/SimplifyLocals.cpp
-  src/passes/Souperify.cpp
-  src/passes/SpillPointers.cpp
-  src/passes/SSAify.cpp
-  src/passes/Untee.cpp
-  src/passes/Vacuum.cpp
-  src/passes/WasmIntrinsics.cpp
-  src/wasm/literal.cpp
-  src/wasm/wasm.cpp
-  src/wasm/wasm-binary.cpp
-  src/wasm/wasm-emscripten.cpp
-  src/wasm/wasm-interpreter.cpp
-  src/wasm/wasm-io.cpp
-  src/wasm/wasm-s-parser.cpp
-  src/wasm/wasm-type.cpp
-  src/wasm/wasm-validator.cpp
-  src/asmjs/asm_v_wasm.cpp
-  src/asmjs/asmangle.cpp
-  src/asmjs/shared-constants.cpp
-  src/emscripten-optimizer/optimizer-shared.cpp
-  src/emscripten-optimizer/parser.cpp
-  src/emscripten-optimizer/simple_ast.cpp
-  src/ir/ExpressionAnalyzer.cpp
-  src/ir/ExpressionManipulator.cpp
-  src/ir/LocalGraph.cpp
-  src/ir/ReFinalize.cpp
-  src/cfg/Relooper.cpp
-  src/support/archive.cpp
-  src/support/bits.cpp
-  src/support/colors.cpp
-  src/support/file.cpp
-  src/support/safe_integer.cpp
-  src/support/threads.cpp
 )
-ADD_LIBRARY(binaryen STATIC ${binaryen_SOURCES})
-TARGET_LINK_LIBRARIES(binaryen ${CMAKE_THREAD_LIBS_INIT})
+ADD_SOURCES(${binaryen_SOURCES})
 
-add_custom_command(
-  OUTPUT ${PROJECT_SOURCE_DIR}/src/passes/WasmIntrinsics.cpp
-  COMMAND python ${PROJECT_SOURCE_DIR}/scripts/embedwast.py ${PROJECT_SOURCE_DIR}/src/passes/wasm-intrinsics.wast ${PROJECT_SOURCE_DIR}/src/passes/WasmIntrinsics.cpp
-  DEPENDS ${PROJECT_SOURCE_DIR}/scripts/embedwast.py ${PROJECT_SOURCE_DIR}/src/passes/wasm-intrinsics.wast)
-add_custom_target(intrinsic-gen DEPENDS ${PROJECT_SOURCE_DIR}/src/passes/WasmIntrinsics.cpp)
-add_dependencies(binaryen intrinsic-gen)
+#TARGET_LINK_LIBRARIES(binaryen PRIVATE ${CMAKE_THREAD_LIBS_INIT})
+ADD_DEPENDENCIES(binaryen GenerateWasmIntrinsics)
 
-SET_TARGET_PROPERTIES(binaryen PROPERTIES
-  ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_SOURCE_DIR}/../../lib
-  ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_SOURCE_DIR}/../../lib
-  ARCHIVE_OUTPUT_DIRECTORY_RELWITHDEPINFO ${CMAKE_CURRENT_SOURCE_DIR}/../../lib
-)
+SET_SOURCE_FILES_PROPERTIES(
+  ${CMAKE_CURRENT_BINARY_DIR}/src/passes/WasmIntrinsics.cpp PROPERTIES GENERATED TRUE)
 
-FILE(INSTALL
-	 ${CMAKE_CURRENT_SOURCE_DIR}/src/binaryen-c.h
-	 ${CMAKE_CURRENT_SOURCE_DIR}/src/compiler-support.h
+FILE(INSTALL src/binaryen-c.h src/compiler-support.h
      DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
